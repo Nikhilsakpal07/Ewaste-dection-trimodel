@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RECIBOT // E-WASTE AI</title>
+    <title>RECIBOT // TRI-MODEL E-WASTE AI SUITE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         const localIp = "{{ local_ip }}";
     </script>
@@ -24,208 +25,544 @@
     <div class="vignette"></div>
 
     <!-- Decorative HUD Elements -->
-    <div class="hud top-left">SYS.RECIBOT.v8</div>
-    <div class="hud top-right" id="hud-clock">00:00:00</div>
-    <div class="hud bottom-left">AI_STATUS: ACTIVE</div>
-    <div class="hud bottom-right">TARGET: E-WASTE</div>
+    <div class="hud top-left">RECIBOT.TRI-MODEL.SYSTEM // v3.0</div>
+    <div class="hud top-right" id="hud-clock">00:00:00 UTC</div>
+    <div class="hud bottom-left">MODELS: YOLOv8 | YOLOv5 | FASTER R-CNN</div>
+    <div class="hud bottom-right">GEMINI_LLM: REPORT_ENGINE_ONLY</div>
 
     <!-- Navigation -->
     <nav class="navbar">
-        <div class="nav-logo glitch" data-text="♻️ RECIBOT">♻️ RECIBOT</div>
+        <div class="nav-logo glitch" data-text="♻️ RECIBOT">♻️ RECIBOT <span class="logo-sub">TRI-VISION</span></div>
         <div class="nav-links">
             <a href="#hero">INIT</a>
-            <a href="#about">SYSTEMS</a>
-            <a href="#impact">IMPACT_DATA</a>
+            <a href="#architectures">ARCHITECTURES</a>
+            <a href="#app" class="nav-highlight">TRIO_DASHBOARD</a>
+            <a href="#comparison">BENCHMARK</a>
+            <a href="#report-section">AI_REPORT</a>
             <a href="#" class="glitch" id="btn-inventory" data-text="INVENTORY_LOG">INVENTORY_LOG</a>
             <a href="#" class="glitch" id="btn-mobile-connect" data-text="MOBILE_LINK" style="color: var(--hazard);">MOBILE_LINK</a>
-            <a href="#app" class="btn-primary-outline">[ RUN_DETECTOR ]</a>
+            <a href="#app" class="btn-primary-outline">[ RUN_3_MODELS ]</a>
         </div>
     </nav>
 
     <!-- Scrolling Marquee -->
     <div class="marquee-wrapper">
         <div class="marquee">
-            <span>DETECTING 77 CLASSES OF E-WASTE // SMARTPHONES // MOTHERBOARDS // CRT MONITORS // LAPTOPS // BATTERIES // RECOVERING PRECIOUS METALS // PROTECTING ECOSYSTEMS // </span>
-            <span>DETECTING 77 CLASSES OF E-WASTE // SMARTPHONES // MOTHERBOARDS // CRT MONITORS // LAPTOPS // BATTERIES // RECOVERING PRECIOUS METALS // PROTECTING ECOSYSTEMS // </span>
+            <span>YOLOV8 ANCHOR-FREE SOTA // YOLOV5 ANCHOR-BASED BASELINE // FASTER R-CNN RESNET-50-FPN TWO-STAGE // GEMINI LLM RECYCLING AUDIT // 77 E-WASTE CLASSES // </span>
+            <span>YOLOV8 ANCHOR-FREE SOTA // YOLOV5 ANCHOR-BASED BASELINE // FASTER R-CNN RESNET-50-FPN TWO-STAGE // GEMINI LLM RECYCLING AUDIT // 77 E-WASTE CLASSES // </span>
         </div>
     </div>
 
     <!-- Hero Section -->
     <section id="hero" class="hero-section">
         <div class="hero-content">
-            <h1 class="hero-title glitch" data-text="MINE THE">MINE THE <br><span class="highlight">FUTURE.</span></h1>
-            <p class="hero-subtitle">Don't discard. Decode. Our YOLOv8 neural network and Gemini AI extract the hidden value and hazard data from electronic waste in real-time.</p>
+            <div class="hero-badge glitch" data-text="[ 3-MODEL PARALLEL VISION ARCHITECTURE ]">[ 3-MODEL PARALLEL VISION ARCHITECTURE ]</div>
+            <h1 class="hero-title glitch" data-text="TRI-ENGINE">TRI-ENGINE <br><span class="highlight">E-WASTE AI.</span></h1>
+            <p class="hero-subtitle">
+                Simultaneous multi-model inference across three distinct computer vision architectures: 
+                <strong>YOLOv8</strong>, <strong>YOLOv5</strong>, and <strong>Faster R-CNN</strong> with ResNet-50-FPN. 
+                No synthetic detections — each engine runs its dedicated neural weights, with <strong>Google Gemini LLM</strong> generating comprehensive environmental hazard and material recovery audits.
+            </p>
             <div class="hero-actions">
-                <a href="#app" class="btn-primary">INITIALIZE SCANNER</a>
+                <a href="#app" class="btn-primary">INITIALIZE 3-MODEL SCANNER</a>
+                <a href="#comparison" class="btn-secondary">VIEW ARCHITECTURE BENCHMARK</a>
+            </div>
+            
+            <div class="hero-model-pills">
+                <div class="model-pill v8-pill">
+                    <span class="pill-dot"></span>
+                    <span class="pill-title">YOLOv8n SOTA</span>
+                    <span class="pill-tag">Anchor-Free C2f</span>
+                </div>
+                <div class="model-pill v5-pill">
+                    <span class="pill-dot"></span>
+                    <span class="pill-title">YOLOv5s Baseline</span>
+                    <span class="pill-tag">Anchor-Based C3</span>
+                </div>
+                <div class="model-pill frcnn-pill">
+                    <span class="pill-dot"></span>
+                    <span class="pill-title">Faster R-CNN</span>
+                    <span class="pill-tag">ResNet-50 + FPN</span>
+                </div>
             </div>
         </div>
+
         <div class="hero-graphic">
             <div class="tech-circle"></div>
             <div class="tech-circle small"></div>
             <img src="https://images.unsplash.com/photo-1550009158-9ebf69173e03?auto=format&fit=crop&w=800&q=80" alt="Cyberpunk Circuit" class="hero-img">
             <div class="scanline"></div>
-            <div class="floating-chip chip-1">[ YOLOv8_VISION ]</div>
-            <div class="floating-chip chip-2">[ GEMINI_LLM ]</div>
+            <div class="floating-chip chip-1">[ YOLOv8 + YOLOv5 ]</div>
+            <div class="floating-chip chip-2">[ FASTER R-CNN ]</div>
+            <div class="floating-chip chip-3">[ GEMINI_REPORT_GEN ]</div>
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about" class="about-section">
+    <!-- Architecture Systems Section -->
+    <section id="architectures" class="about-section">
         <div class="section-container">
             <div class="section-header">
-                <h2 class="section-heading glitch" data-text="CORE_SYSTEMS">CORE_SYSTEMS</h2>
+                <h2 class="section-heading glitch" data-text="THE_3_PARADIGMS">THE_3_PARADIGMS</h2>
                 <div class="hex-grid" id="random-hex">0x3F8A 0x9B21 0xFFFF</div>
             </div>
             
             <div class="features-grid">
-                <div class="feature-card glass-card tilt-card">
-                    <div class="f-icon">👁️</div>
-                    <h3>Computer Vision</h3>
-                    <p>Sub-millisecond object detection analyzing 77 distinct hardware categories through advanced neural pathways.</p>
-                    <div class="card-border"></div>
+                <div class="feature-card glass-card tilt-card v8-border">
+                    <div class="f-badge v8-color">MODEL 01 // PRODUCTION</div>
+                    <div class="f-icon">⚡</div>
+                    <h3>YOLOv8 (Anchor-Free SOTA)</h3>
+                    <p>Modified CSPDarknet with C2f modules and split decoupled head. Directly regresses bounding box borders without anchor hyperparameter clustering. Maximizes inference FPS on live cameras.</p>
+                    <div class="spec-list">
+                        <span><strong>Backbone:</strong> C2f Gradient Fusion</span>
+                        <span><strong>Head:</strong> Decoupled Box & Cls</span>
+                        <span><strong>Loss:</strong> CIoU + DFL + BCE</span>
+                    </div>
+                    <div class="card-border v8-bg"></div>
                 </div>
-                <div class="feature-card glass-card tilt-card">
-                    <div class="f-icon">🧠</div>
-                    <h3>Gemini AI Analysis</h3>
-                    <p>Instant environmental extraction. Identifies toxic chemical leaks and provides precise recycling protocols.</p>
-                    <div class="card-border"></div>
+
+                <div class="feature-card glass-card tilt-card v5-border">
+                    <div class="f-badge v5-color">MODEL 02 // BASELINE</div>
+                    <div class="f-icon">🎯</div>
+                    <h3>YOLOv5 (Anchor-Based Baseline)</h3>
+                    <p>Proven single-stage baseline utilizing CSPDarknet53 with C3 bottleneck modules and PANet multi-scale feature pyramids. Evaluates k-means clustered anchors across varied hardware geometry.</p>
+                    <div class="spec-list">
+                        <span><strong>Backbone:</strong> C3 Cross Stage Partial</span>
+                        <span><strong>Neck:</strong> PANet + SPPF</span>
+                        <span><strong>Loss:</strong> CIoU + Objectness + Cls</span>
+                    </div>
+                    <div class="card-border v5-bg"></div>
                 </div>
-                <div class="feature-card glass-card tilt-card">
-                    <div class="f-icon">💎</div>
-                    <h3>Urban Mining</h3>
-                    <p>Quantifies raw material value (Gold, Silver, Palladium) hidden inside discarded silicon and copper.</p>
-                    <div class="card-border"></div>
+
+                <div class="feature-card glass-card tilt-card frcnn-border">
+                    <div class="f-badge frcnn-color">MODEL 03 // TWO-STAGE</div>
+                    <div class="f-icon">🔬</div>
+                    <h3>Faster R-CNN (ResNet-50-FPN)</h3>
+                    <p>Academic two-stage gold standard. Utilizes a Region Proposal Network (RPN) followed by RoIAlign to sample sub-pixel feature patches. Superior precision in heavily cluttered scrap piles.</p>
+                    <div class="spec-list">
+                        <span><strong>Backbone:</strong> ResNet-50 (50 Residual Layers)</span>
+                        <span><strong>Neck:</strong> Feature Pyramid Network (FPN)</span>
+                        <span><strong>Stage 2:</strong> RoIAlign + 1024-D FC Predictor</span>
+                    </div>
+                    <div class="card-border frcnn-bg"></div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Impact Section -->
-    <section id="impact" class="impact-section">
-        <div class="section-container split-layout">
-            <div class="split-text">
-                <h2 class="section-heading">THE TOXIC <br><span class="highlight">TRUTH</span></h2>
-                <p>E-waste represents 2% of America's trash in landfills, but it equals 70% of overall toxic waste. Lead, mercury, and cadmium are leaching into our water tables.</p>
-                <p>By utilizing <strong>ReciBot</strong>, recycling facilities and individuals can instantly sort hazardous materials and identify components ripe for precious metal extraction.</p>
-                <div class="bar-chart">
-                    <div class="bar-row">
-                        <span>RECYCLED</span>
-                        <div class="bar-bg"><div class="bar-fill" style="width: 17%; background: var(--hazard);">17%</div></div>
-                    </div>
-                    <div class="bar-row">
-                        <span>TRASHED</span>
-                        <div class="bar-bg"><div class="bar-fill" style="width: 83%; background: var(--primary);">83%</div></div>
-                    </div>
-                </div>
-            </div>
-            <div class="split-stats">
-                <div class="glass-card tilt-card stat-card">
-                    <div class="stat-num glow-text">100x</div>
-                    <div class="stat-label">More Gold in E-Waste than in Ore</div>
-                </div>
-                <div class="glass-card tilt-card stat-card mt">
-                    <div class="stat-num glow-text">77</div>
-                    <div class="stat-label">Device Architectures Recognized</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- The App Section -->
+    <!-- The App Section (Simultaneous 3-Model Dashboard) -->
     <section id="app" class="app-section">
         <div class="app-container">
             <header class="app-header">
-                <h2 class="section-heading glitch" data-text="TERMINAL_ACCESS">TERMINAL_ACCESS</h2>
-                <p class="subtitle">Awaiting visual input for hardware classification.</p>
+                <div class="app-badge glitch" data-text="SIMULTANEOUS TRIO ENGINE">SIMULTANEOUS TRIO ENGINE</div>
+                <h2 class="section-heading glitch" data-text="TRI-MODEL_VISION_SUITE">TRI-MODEL_VISION_SUITE</h2>
+                <p class="subtitle">Executing YOLOv8, YOLOv5, and Faster R-CNN concurrently with independent weights & pipelines.</p>
             </header>
 
-            <div class="controls">
-                <div class="toggle-container">
-                    <button id="btn-live" class="toggle-btn active">[ LIVE_FEED ]</button>
-                    <button id="btn-upload" class="toggle-btn">[ STATIC_UPLOAD ]</button>
+            <!-- Input Controls & Sample Presets -->
+            <div class="input-hub-panel glass-card">
+                <div class="hub-header">
+                    <div class="hub-title">
+                        <span class="icon">🛰️</span>
+                        <span>INPUT_TELEMETRY_DISPATCHER</span>
+                    </div>
+                    <div class="hub-status" id="model-status-indicator">
+                        <span class="status-dot"></span>
+                        <span id="global-status-text">ENGINES READY (YOLOv8 // YOLOv5 // FASTER R-CNN)</span>
+                    </div>
+                </div>
+
+                <div class="hub-body">
+                    <!-- Mode Buttons -->
+                    <div class="controls-row">
+                        <div class="toggle-container">
+                            <button id="btn-mode-samples" class="toggle-btn active">[ 📁 PRESET SAMPLES ]</button>
+                            <button id="btn-mode-upload" class="toggle-btn">[ 📤 UPLOAD IMAGE ]</button>
+                            <button id="btn-mode-webcam" class="toggle-btn">[ 📷 WEBCAM SNAPSHOT ]</button>
+                            <button id="btn-mode-live" class="toggle-btn">[ 🔴 LIVE STREAM ]</button>
+                        </div>
+
+                        <!-- Live Stream Active Model Selector -->
+                        <div class="stream-selector" id="stream-selector-box" style="display: none;">
+                            <span class="selector-label">STREAM ENGINE:</span>
+                            <button class="stream-btn active" data-model="yolov8">YOLOv8 (Fastest)</button>
+                            <button class="stream-btn" data-model="yolov5">YOLOv5</button>
+                            <button class="stream-btn" data-model="faster_rcnn">Faster R-CNN</button>
+                        </div>
+                    </div>
+
+                    <!-- 1-Click Sample Presets Bar -->
+                    <div id="samples-container" class="samples-bar">
+                        <span class="samples-label">ONE-CLICK AUDIT SAMPLES:</span>
+                        <div class="samples-grid">
+                            <button class="sample-btn" data-sample="pcb">
+                                <span class="s-icon">🔌</span>
+                                <span class="s-name">Motherboard / PCB</span>
+                            </button>
+                            <button class="sample-btn" data-sample="battery">
+                                <span class="s-icon">🔋</span>
+                                <span class="s-name">Lithium Battery</span>
+                            </button>
+                            <button class="sample-btn" data-sample="smartphone">
+                                <span class="s-icon">📱</span>
+                                <span class="s-name">Smartphone</span>
+                            </button>
+                            <button class="sample-btn" data-sample="laptop">
+                                <span class="s-icon">💻</span>
+                                <span class="s-name">Laptop Device</span>
+                            </button>
+                            <button class="sample-btn" data-sample="refrigerator">
+                                <span class="s-icon">🧊</span>
+                                <span class="s-name">Appliance Refrigerator</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Upload Input -->
+                    <div id="upload-panel" class="input-subpanel" style="display: none;">
+                        <input type="file" id="file-input" accept="image/*" hidden>
+                        <div class="upload-dropzone" id="upload-dropzone">
+                            <div class="drop-icon">📤</div>
+                            <h3>DRAG & DROP E-WASTE IMAGE</h3>
+                            <p>or click here to browse hardware photos (JPG, PNG, WebP)</p>
+                            <button id="btn-browse-file" class="action-btn mt-2">BROWSE FILES</button>
+                        </div>
+                    </div>
+
+                    <!-- Webcam Snapshot Panel -->
+                    <div id="webcam-panel" class="input-subpanel" style="display: none;">
+                        <div class="webcam-view-wrapper">
+                            <video id="webcam-stream" autoplay playsinline></video>
+                            <canvas id="webcam-snapshot-canvas" style="display: none;"></canvas>
+                            <div class="webcam-controls">
+                                <button id="btn-take-snapshot" class="btn-primary">[ CAPTURE & RUN 3 MODELS ]</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Stream Panel -->
+                    <div id="live-panel" class="input-subpanel" style="display: none;">
+                        <div class="live-stream-wrapper">
+                            <img id="live-video-feed" src="" alt="Live Video Feed">
+                            <div class="overlay-scan"><div class="scan-line"></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Master Execution Button -->
+                    <div class="action-bar">
+                        <button id="btn-run-all" class="btn-primary-glow glitch" data-text="RUN SIMULTANEOUS 3-MODEL SCAN">
+                            ⚡ RUN SIMULTANEOUS 3-MODEL SCAN
+                        </button>
+                        <div class="data-stream" id="data-stream">System ready. Awaiting input image...</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="main-content">
-                <!-- Left Side: Vision -->
-                <div class="vision-panel panel tilt-card">
-                    <!-- Live View -->
-                    <div id="live-view" class="view-section active">
-                        <div class="video-container">
-                            <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Live Video Feed">
-                            <div class="overlay-scan">
-                                <div class="scan-line"></div>
-                                <div class="reticle"></div>
+            <!-- SIMULTANEOUS 3-MODEL DASHBOARD SECTION -->
+            <div class="trio-dashboard-section" id="trio-dashboard">
+                <div class="section-title-bar">
+                    <h3 class="trio-heading glitch" data-text="SIMULTANEOUS_MODEL_INSPECTION_DASHBOARD">SIMULTANEOUS_MODEL_INSPECTION_DASHBOARD</h3>
+                    <div class="live-badge">3 CORES PARALLEL</div>
+                </div>
+
+                <div class="trio-grid">
+                    <!-- ============================================== -->
+                    <!-- DASHBOARD SECTION 1: YOLOv8 SOTA               -->
+                    <!-- ============================================== -->
+                    <div class="model-card glass-card v8-card" id="card-yolov8">
+                        <div class="card-top-bar">
+                            <div class="model-tag v8-tag">
+                                <span class="tag-number">01</span>
+                                <span class="tag-name">YOLOv8 SOTA</span>
+                            </div>
+                            <div class="badge-arch">Anchor-Free (C2f)</div>
+                        </div>
+
+                        <!-- Visual Output Panel -->
+                        <div class="display-panel">
+                            <div class="img-frame">
+                                <img id="v8-img" src="{{ url_for('static', filename='samples/pcb.jpg') }}" alt="YOLOv8 Output">
+                                <div class="overlay-scan"><div class="scan-line"></div></div>
+                            </div>
+                            <div class="telemetry-bar">
+                                <div class="tele-item">
+                                    <span class="t-lbl">LATENCY</span>
+                                    <span class="t-val" id="v8-latency">-- ms</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">OBJECTS</span>
+                                    <span class="t-val" id="v8-count">0</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">FPS EST</span>
+                                    <span class="t-val" id="v8-fps">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Primary Metric Card -->
+                        <div class="primary-det-card">
+                            <div class="det-header">
+                                <div class="det-class v8-color" id="v8-class">AWAITING SCAN</div>
+                                <div class="det-conf" id="v8-conf">0%</div>
+                            </div>
+                            <div class="conf-meter-bg">
+                                <div class="conf-meter-fill v8-bg" id="v8-meter" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Secondary Metrics Row -->
+                        <div class="sub-metrics-row">
+                            <div class="metric-box">
+                                <span class="m-label">EST. RECOVERY</span>
+                                <span class="m-val" id="v8-value">₹0</span>
+                            </div>
+                            <div class="metric-box hazard-box" id="v8-hazard-box">
+                                <span class="m-label">HAZARD RISK</span>
+                                <span class="m-val hazard-text" id="v8-hazard">SECURE</span>
+                            </div>
+                        </div>
+
+                        <!-- Detections Breakdown List -->
+                        <div class="breakdown-box">
+                            <div class="b-title">DETECTED HARDWARE:</div>
+                            <div class="b-tags" id="v8-tags">
+                                <span class="no-tags">No active detections</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Upload View -->
-                    <div id="upload-view" class="view-section">
-                        <div class="upload-container" id="upload-box">
-                            <input type="file" id="file-input" accept="image/*" hidden>
-                            <div class="upload-icon glitch" data-text="📸">📸</div>
-                            <h3 style="font-family: 'Share Tech Mono';">PROVIDE VISUAL DATA</h3>
-                            <div class="flex-row mt-4" style="gap: 1rem; margin-top: 1.5rem;">
-                                <button id="btn-trigger-file" class="action-btn">UPLOAD_FILE</button>
-                                <button id="btn-trigger-webcam" class="action-btn">INIT_WEBCAM</button>
+                    <!-- ============================================== -->
+                    <!-- DASHBOARD SECTION 2: YOLOv5 Baseline           -->
+                    <!-- ============================================== -->
+                    <div class="model-card glass-card v5-card" id="card-yolov5">
+                        <div class="card-top-bar">
+                            <div class="model-tag v5-tag">
+                                <span class="tag-number">02</span>
+                                <span class="tag-name">YOLOv5 BASELINE</span>
                             </div>
+                            <div class="badge-arch">Anchor-Based (C3)</div>
                         </div>
 
-                        <div id="webcam-box" style="display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                            <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; border-radius: 16px; border: 2px solid var(--primary);"></video>
-                            <div class="overlay-scan"><div class="reticle"></div></div>
-                            <button id="btn-capture-webcam" class="btn-primary" style="position: absolute; bottom: 20px; z-index: 10;">[ CAPTURE_FRAME ]</button>
-                            <button id="btn-cancel-webcam" class="action-btn" style="position: absolute; top: 10px; right: 10px; z-index: 10; background: rgba(0,0,0,0.8);">ABORT</button>
-                            <canvas id="webcam-canvas" style="display: none;"></canvas>
-                        </div>
-
-                        <div class="preview-container" style="display: none;">
-                            <div class="video-container">
-                                <img id="image-preview" src="" alt="Detected Image">
+                        <!-- Visual Output Panel -->
+                        <div class="display-panel">
+                            <div class="img-frame">
+                                <img id="v5-img" src="{{ url_for('static', filename='samples/pcb.jpg') }}" alt="YOLOv5 Output">
                                 <div class="overlay-scan"><div class="scan-line"></div></div>
                             </div>
-                            <button id="btn-reset-upload" class="action-btn mt-4" style="margin-top: 1rem;">NEW_SCAN</button>
+                            <div class="telemetry-bar">
+                                <div class="tele-item">
+                                    <span class="t-lbl">LATENCY</span>
+                                    <span class="t-val" id="v5-latency">-- ms</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">OBJECTS</span>
+                                    <span class="t-val" id="v5-count">0</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">FPS EST</span>
+                                    <span class="t-val" id="v5-fps">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Primary Metric Card -->
+                        <div class="primary-det-card">
+                            <div class="det-header">
+                                <div class="det-class v5-color" id="v5-class">AWAITING SCAN</div>
+                                <div class="det-conf" id="v5-conf">0%</div>
+                            </div>
+                            <div class="conf-meter-bg">
+                                <div class="conf-meter-fill v5-bg" id="v5-meter" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Secondary Metrics Row -->
+                        <div class="sub-metrics-row">
+                            <div class="metric-box">
+                                <span class="m-label">EST. RECOVERY</span>
+                                <span class="m-val" id="v5-value">₹0</span>
+                            </div>
+                            <div class="metric-box hazard-box" id="v5-hazard-box">
+                                <span class="m-label">HAZARD RISK</span>
+                                <span class="m-val hazard-text" id="v5-hazard">SECURE</span>
+                            </div>
+                        </div>
+
+                        <!-- Detections Breakdown List -->
+                        <div class="breakdown-box">
+                            <div class="b-title">DETECTED HARDWARE:</div>
+                            <div class="b-tags" id="v5-tags">
+                                <span class="no-tags">No active detections</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================== -->
+                    <!-- DASHBOARD SECTION 3: Faster R-CNN Two-Stage    -->
+                    <!-- ============================================== -->
+                    <div class="model-card glass-card frcnn-card" id="card-faster-rcnn">
+                        <div class="card-top-bar">
+                            <div class="model-tag frcnn-tag">
+                                <span class="tag-number">03</span>
+                                <span class="tag-name">FASTER R-CNN</span>
+                            </div>
+                            <div class="badge-arch">ResNet-50-FPN Two-Stage</div>
+                        </div>
+
+                        <!-- Visual Output Panel -->
+                        <div class="display-panel">
+                            <div class="img-frame">
+                                <img id="frcnn-img" src="{{ url_for('static', filename='samples/pcb.jpg') }}" alt="Faster R-CNN Output">
+                                <div class="overlay-scan"><div class="scan-line"></div></div>
+                            </div>
+                            <div class="telemetry-bar">
+                                <div class="tele-item">
+                                    <span class="t-lbl">LATENCY</span>
+                                    <span class="t-val" id="frcnn-latency">-- ms</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">OBJECTS</span>
+                                    <span class="t-val" id="frcnn-count">0</span>
+                                </div>
+                                <div class="tele-item">
+                                    <span class="t-lbl">STAGE</span>
+                                    <span class="t-val" id="frcnn-fps">RPN + RoI</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Primary Metric Card -->
+                        <div class="primary-det-card">
+                            <div class="det-header">
+                                <div class="det-class frcnn-color" id="frcnn-class">AWAITING SCAN</div>
+                                <div class="det-conf" id="frcnn-conf">0%</div>
+                            </div>
+                            <div class="conf-meter-bg">
+                                <div class="conf-meter-fill frcnn-bg" id="frcnn-meter" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Secondary Metrics Row -->
+                        <div class="sub-metrics-row">
+                            <div class="metric-box">
+                                <span class="m-label">EST. RECOVERY</span>
+                                <span class="m-val" id="frcnn-value">₹0</span>
+                            </div>
+                            <div class="metric-box hazard-box" id="frcnn-hazard-box">
+                                <span class="m-label">HAZARD RISK</span>
+                                <span class="m-val hazard-text" id="frcnn-hazard">SECURE</span>
+                            </div>
+                        </div>
+
+                        <!-- Detections Breakdown List -->
+                        <div class="breakdown-box">
+                            <div class="b-title">DETECTED HARDWARE:</div>
+                            <div class="b-tags" id="frcnn-tags">
+                                <span class="no-tags">No active detections</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Right Side: Analytics -->
-                <div class="analytics-panel panel tilt-card">
-                    <div class="data-stream" id="data-stream">Analyzing binary...</div>
-                    
-                    <div class="card-glass">
-                        <h2 class="card-title">DETECTION_RESULT</h2>
-                        <div class="result-header">
-                            <div class="class-badge glitch-text" id="detected-class">AWAITING...</div>
-                            <div class="confidence" id="detected-conf">0.00%</div>
+            <!-- SIDE-BY-SIDE BENCHMARK COMPARISON MATRIX -->
+            <div class="benchmark-section" id="comparison">
+                <div class="section-title-bar">
+                    <h3 class="trio-heading glitch" data-text="ARCHITECTURE_BENCHMARK_MATRIX">ARCHITECTURE_BENCHMARK_MATRIX</h3>
+                    <div class="live-badge">REAL-TIME CONSENSUS</div>
+                </div>
+
+                <div class="matrix-card glass-card">
+                    <table class="benchmark-table">
+                        <thead>
+                            <tr>
+                                <th>EVALUATION METRIC</th>
+                                <th class="v8-color">YOLOv8 SOTA</th>
+                                <th class="v5-color">YOLOv5 BASELINE</th>
+                                <th class="frcnn-color">FASTER R-CNN (FPN)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="metric-name">Architecture Paradigm</td>
+                                <td>Single-Stage (Anchor-Free C2f)</td>
+                                <td>Single-Stage (Anchor-Based C3)</td>
+                                <td>Two-Stage (RPN + RoIAlign)</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Inference Latency</td>
+                                <td id="tbl-v8-latency" class="highlight-val">--</td>
+                                <td id="tbl-v5-latency" class="highlight-val">--</td>
+                                <td id="tbl-frcnn-latency" class="highlight-val">--</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Objects Detected</td>
+                                <td id="tbl-v8-count">0</td>
+                                <td id="tbl-v5-count">0</td>
+                                <td id="tbl-frcnn-count">0</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Primary Class & Confidence</td>
+                                <td id="tbl-v8-primary">--</td>
+                                <td id="tbl-v5-primary">--</td>
+                                <td id="tbl-frcnn-primary">--</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Estimated Scrap Value</td>
+                                <td id="tbl-v8-val">₹0</td>
+                                <td id="tbl-v5-val">₹0</td>
+                                <td id="tbl-frcnn-val">₹0</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Hazard Toxicity Risk</td>
+                                <td id="tbl-v8-hazard">--</td>
+                                <td id="tbl-v5-hazard">--</td>
+                                <td id="tbl-frcnn-hazard">--</td>
+                            </tr>
+                            <tr>
+                                <td class="metric-name">Recommended Deployment</td>
+                                <td>Real-time Mobile / Web Stream</td>
+                                <td>Embedded / Lightweight Edge</td>
+                                <td>High-Precision Scrap Sorting Hub</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- GEMINI LLM ENVIRONMENTAL IMPACT REPORT SECTION -->
+            <div class="report-section" id="report-section">
+                <div class="report-header-banner">
+                    <div class="banner-left">
+                        <span class="report-icon">🧠</span>
+                        <div>
+                            <h3 class="report-title glitch" data-text="GEMINI_LLM // ENVIRONMENTAL_RECYCLING_AUDIT">GEMINI_LLM // ENVIRONMENTAL_RECYCLING_AUDIT</h3>
+                            <p class="report-subtitle">
+                                Hardware detection was executed independently by YOLOv8, YOLOv5, and Faster R-CNN. 
+                                Gemini LLM is used exclusively for technical material toxicity analysis, precious metal yields, and recycling directives.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="banner-actions">
+                        <button id="btn-copy-report" class="action-btn">📋 COPY REPORT</button>
+                        <button id="btn-regen-report" class="action-btn">🔄 RE-RUN AUDIT</button>
+                    </div>
+                </div>
+
+                <div class="report-card glass-card">
+                    <div id="report-content" class="report-markdown">
+                        <div class="report-placeholder">
+                            <span class="spinner-icon">⚙️</span>
+                            <p>Execute a 3-model scan to generate the comprehensive Gemini E-Waste recycling roadmap and environmental impact audit.</p>
                         </div>
                     </div>
 
-                    <div class="card-glass flex-row">
-                        <div class="value-box">
-                            <span class="label">EST_RECOVERY_VALUE</span>
-                            <span class="value digital-num" id="detected-value">₹0</span>
-                        </div>
-                        <div class="hazard-box" id="hazard-badge">
-                            <span class="icon">✅</span>
-                            <span class="text">SECURE</span>
-                        </div>
-                    </div>
-
-                    <div class="card-glass impact-card" id="hazard-warning-card" style="display: none; border-color: var(--hazard);">
-                        <h3 class="hazard-title glitch" data-text="☣️ HAZMAT_WARNING">☣️ HAZMAT_WARNING</h3>
-                        <p id="hazard-text" style="font-family: 'Share Tech Mono';">Contains hazardous materials.</p>
-                    </div>
-
-                    <div class="card-glass impact-card">
-                        <h3 class="card-title">AI_IMPACT_ANALYSIS</h3>
-                        <p class="impact-text" id="detected-impact">System idle. Waiting for object detection...</p>
-                    </div>
-
-                    <div class="card-glass" id="locator-card" style="display: none; text-align: center; margin-top: 15px;">
-                        <button id="btn-locate" class="btn-primary" style="width: 100%; padding: 10px; font-family: 'Share Tech Mono'; letter-spacing: 1px;">[ LOCATE_DROP_OFF_FACILITY ]</button>
-                        <p id="locator-status" style="font-size: 0.8rem; margin-top: 10px; color: var(--text-muted);"></p>
+                    <!-- Geolocation Drop-Off Facility Router -->
+                    <div class="locator-footer">
+                        <button id="btn-locate" class="btn-primary" style="width: 100%; max-width: 450px;">
+                            [ 📍 LOCATE CERTIFIED E-WASTE DROP-OFF FACILITY ]
+                        </button>
+                        <p id="locator-status" class="locator-status-text"></p>
                     </div>
                 </div>
             </div>
@@ -233,28 +570,34 @@
     </section>
 
     <!-- Inventory Modal -->
-    <div id="inventory-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15,17,26,0.95); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; overflow: hidden;">
-        <h2 style="color: var(--primary); margin-bottom: 20px; font-size: 2rem;" class="glitch" data-text="SCANNED_INVENTORY_LOG">SCANNED_INVENTORY_LOG</h2>
-        <div id="inventory-container" style="background: var(--surface); width: 90%; max-width: 900px; height: 70vh; border-radius: 10px; overflow-y: auto; padding: 20px; border: 1px solid rgba(130, 170, 255, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-            <p style="text-align: center; color: var(--text-muted); font-style: italic;">Loading inventory records...</p>
+    <div id="inventory-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h2 class="glitch" data-text="SCANNED_INVENTORY_LOG">SCANNED_INVENTORY_LOG</h2>
+                <button id="btn-close-inventory" class="action-btn">✕ CLOSE</button>
+            </div>
+            <div id="inventory-container" class="inventory-scroll">
+                <p class="muted-text">Loading inventory records...</p>
+            </div>
         </div>
-        <button id="btn-close-inventory" class="btn-primary" style="margin-top: 30px; font-family: 'Share Tech Mono';">CLOSE LOG</button>
     </div>
 
     <!-- Mobile Connect Modal -->
-    <div id="mobile-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15,17,26,0.9); z-index: 1000; justify-content: center; align-items: center; flex-direction: column;">
-        <h2 style="color: var(--primary);">LINK MOBILE SCANNER</h2>
-        <p style="color: var(--text-muted); margin-bottom: 20px;">Scan this QR code with your phone's camera.</p>
-        <div style="background: white; padding: 20px; border-radius: 10px;">
-            <img id="qr-code" src="" alt="QR Code" width="200" height="200" />
+    <div id="mobile-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card modal-center">
+            <h2 class="v8-color">LINK MOBILE SCANNER</h2>
+            <p class="muted-text mb-4">Scan with your phone's camera to use your phone as an active mobile scanner synced directly to this multi-model dashboard.</p>
+            <div class="qr-box">
+                <img id="qr-code" src="" alt="QR Code" width="220" height="220" />
+            </div>
+            <button id="btn-close-modal" class="btn-primary mt-4">[ CLOSE CONNECTION ]</button>
         </div>
-        <button id="btn-close-modal" class="btn-primary" style="margin-top: 30px; font-family: 'Share Tech Mono';">CLOSE CONNECTION</button>
     </div>
 
     <footer class="footer">
-        <p>SYS.RECIBOT // BUILT WITH YOLOv8 & GOOGLE GEMINI AI // NO PLANET B</p>
+        <p>SYS.RECIBOT // POWERED BY YOLOV8 + YOLOV5 + FASTER R-CNN + GOOGLE GEMINI REPORT ENGINE // ALL 3 MODELS LIVE</p>
     </footer>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=1.1"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=3.0"></script>
 </body>
 </html>

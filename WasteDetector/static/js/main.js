@@ -1,15 +1,37 @@
 document.addEventListener("DOMContentLoaded", () => {
-    gsap.registerPlugin(ScrollTrigger);
+    if (window.gsap && window.ScrollTrigger) {
+        gsap.registerPlugin(ScrollTrigger);
+    }
 
-    // Custom Cursor
+    // --- Custom Cursor ---
     const cursor = document.getElementById("cursor");
     const follower = document.getElementById("cursor-follower");
-    document.addEventListener("mousemove", (e) => {
-        gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.1 });
-        gsap.to(follower, { x: e.clientX, y: e.clientY, duration: 0.3 });
-    });
+    if (cursor && follower) {
+        document.addEventListener("mousemove", (e) => {
+            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.08 });
+            gsap.to(follower, { x: e.clientX, y: e.clientY, duration: 0.22 });
+        });
+    }
 
-    // 3D Tilt Effect for cards
+    // --- HUD Clock ---
+    const clockEl = document.getElementById("hud-clock");
+    if (clockEl) {
+        setInterval(() => {
+            const d = new Date();
+            clockEl.innerText = d.toISOString().split('T')[1].split('.')[0] + " UTC";
+        }, 1000);
+    }
+
+    // --- HUD Random Hex Generator ---
+    const hexEl = document.getElementById("random-hex");
+    if (hexEl) {
+        setInterval(() => {
+            const hex = () => "0x" + Math.floor(Math.random() * 65535).toString(16).toUpperCase().padStart(4, '0');
+            hexEl.innerText = `${hex()} ${hex()} ${hex()}`;
+        }, 800);
+    }
+
+    // --- 3D Tilt Effect on Cards ---
     const tiltCards = document.querySelectorAll(".tilt-card");
     tiltCards.forEach(card => {
         card.addEventListener("mousemove", (e) => {
@@ -19,441 +41,543 @@ document.addEventListener("DOMContentLoaded", () => {
             const xPct = x / rect.width - 0.5;
             const yPct = y / rect.height - 0.5;
             gsap.to(card, {
-                rotationY: xPct * 15,
-                rotationX: -yPct * 15,
+                rotationY: xPct * 12,
+                rotationX: -yPct * 12,
                 transformPerspective: 1000,
                 ease: "power1.out",
-                duration: 0.5
+                duration: 0.4
             });
         });
         card.addEventListener("mouseleave", () => {
-            gsap.to(card, { rotationY: 0, rotationX: 0, duration: 0.5, ease: "power1.out" });
+            gsap.to(card, { rotationY: 0, rotationX: 0, duration: 0.4, ease: "power1.out" });
         });
     });
 
-    // (Live E-Waste Counter removed as requested)
+    // --- State & DOM References ---
+    let activeInputMode = "samples"; // samples | upload | webcam | live
+    let currentSample = "pcb";
+    let currentUploadedFile = null;
+    let currentSnapshotBlob = null;
+    let webcamStream = null;
+    let lastScanData = null;
 
-    // Random Hex Generator for HUD
-    const hexEl = document.getElementById("random-hex");
+    // Elements
     const dataStreamEl = document.getElementById("data-stream");
-    setInterval(() => {
-        const hex = () => "0x" + Math.floor(Math.random()*65535).toString(16).toUpperCase().padStart(4, '0');
-        if(hexEl) hexEl.innerText = `${hex()} ${hex()} ${hex()}`;
-        
-        if(Math.random() > 0.7) {
-            const streams = [
-                "Analyzing binary structures...",
-                "Scanning memory blocks...",
-                "Waiting for neural network...",
-                "Processing pixel matrices...",
-                "Allocating tensors..."
-            ];
-            dataStreamEl.innerText = streams[Math.floor(Math.random() * streams.length)];
-        }
-    }, 500);
+    const globalStatusText = document.getElementById("global-status-text");
+    const btnRunAll = document.getElementById("btn-run-all");
 
-    // Clock
-    const clockEl = document.getElementById("hud-clock");
-    setInterval(() => {
-        const d = new Date();
-        clockEl.innerText = d.toISOString().split('T')[1].split('.')[0] + " UTC";
-    }, 1000);
+    // Mode Buttons
+    const btnModeSamples = document.getElementById("btn-mode-samples");
+    const btnModeUpload = document.getElementById("btn-mode-upload");
+    const btnModeWebcam = document.getElementById("btn-mode-webcam");
+    const btnModeLive = document.getElementById("btn-mode-live");
 
-    // Scroll Animations
-    const tlHero = gsap.timeline();
-    tlHero.from(".navbar", { y: -50, opacity: 0, duration: 1, ease: "power3.out" })
-          .from(".hero-content h1", { x: -50, opacity: 0, duration: 1, ease: "power3.out" }, "-=0.5")
-          .from(".hero-content p", { x: -50, opacity: 0, duration: 1, ease: "power3.out" }, "-=0.8")
-          .from(".hero-actions", { y: 20, opacity: 0, duration: 1, ease: "power3.out" }, "-=0.8")
-          .from(".hero-graphic", { scale: 0.8, opacity: 0, duration: 1, ease: "power3.out" }, "-=1");
+    // Subpanels
+    const samplesContainer = document.getElementById("samples-container");
+    const uploadPanel = document.getElementById("upload-panel");
+    const webcamPanel = document.getElementById("webcam-panel");
+    const livePanel = document.getElementById("live-panel");
+    const streamSelectorBox = document.getElementById("stream-selector-box");
 
-    gsap.to(".floating-chip", { y: -15, duration: 2, yoyo: true, repeat: -1, ease: "sine.inOut" });
-    gsap.to(".chip-2", { y: 15, duration: 2.5, yoyo: true, repeat: -1, ease: "sine.inOut" });
-
-    // Scrub animations
-    const cards = gsap.utils.toArray(".feature-card");
-    cards.forEach((card, i) => {
-        gsap.fromTo(card, 
-            { y: 100, opacity: 0 },
-            { 
-                scrollTrigger: { trigger: card, start: "top 90%", end: "top 60%", scrub: 1 },
-                y: 0, opacity: 1, ease: "power2.out"
-            }
-        );
-    });
-
-    gsap.fromTo(".split-text", 
-        { x: -100, opacity: 0 },
-        { scrollTrigger: { trigger: ".impact-section", start: "top 85%", end: "top 50%", scrub: 1 }, x: 0, opacity: 1, ease: "power2.out" }
-    );
-
-    gsap.fromTo(".split-stats .stat-card", 
-        { x: 100, opacity: 0 },
-        { scrollTrigger: { trigger: ".impact-section", start: "top 85%", end: "top 50%", scrub: 1 }, x: 0, opacity: 1, stagger: 0.2, ease: "power2.out" }
-    );
-
-    gsap.fromTo(".app-section .panel", 
-        { y: 100, opacity: 0 },
-        { scrollTrigger: { trigger: ".app-section", start: "top 90%", end: "top 60%", scrub: 1 }, y: 0, opacity: 1, stagger: 0.2, ease: "power2.out" }
-    );
-
-    // App Logic
-    const btnLive = document.getElementById("btn-live");
-    const btnUpload = document.getElementById("btn-upload");
-    const liveView = document.getElementById("live-view");
-    const uploadView = document.getElementById("upload-view");
-    
-    // Upload Elements
-    const uploadBox = document.getElementById("upload-box");
+    // Upload & Webcam elements
     const fileInput = document.getElementById("file-input");
-    const previewContainer = document.querySelector(".preview-container");
-    const imagePreview = document.getElementById("image-preview");
-    const btnResetUpload = document.getElementById("btn-reset-upload");
-    const videoFeed = document.getElementById("video-feed");
+    const btnBrowseFile = document.getElementById("btn-browse-file");
+    const uploadDropzone = document.getElementById("upload-dropzone");
+    const webcamVideo = document.getElementById("webcam-stream");
+    const webcamCanvas = document.getElementById("webcam-snapshot-canvas");
+    const btnTakeSnapshot = document.getElementById("btn-take-snapshot");
+    const liveVideoFeed = document.getElementById("live-video-feed");
 
-    const btnTriggerFile = document.getElementById("btn-trigger-file");
-    const btnTriggerWebcam = document.getElementById("btn-trigger-webcam");
-    const webcamBox = document.getElementById("webcam-box");
-    const webcamVideo = document.getElementById("webcam-video");
-    const btnCaptureWebcam = document.getElementById("btn-capture-webcam");
-    const btnCancelWebcam = document.getElementById("btn-cancel-webcam");
-    const webcamCanvas = document.getElementById("webcam-canvas");
-
-    const elClass = document.getElementById("detected-class");
-    const elConf = document.getElementById("detected-conf");
-    const elValue = document.getElementById("detected-value");
-    const elHazardBadge = document.getElementById("hazard-badge");
-    const elHazardWarningCard = document.getElementById("hazard-warning-card");
-    const elHazardText = document.getElementById("hazard-text");
-    const elImpact = document.getElementById("detected-impact");
-
-    const locatorCard = document.getElementById("locator-card");
+    // Report elements
+    const reportContent = document.getElementById("report-content");
+    const btnCopyReport = document.getElementById("btn-copy-report");
+    const btnRegenReport = document.getElementById("btn-regen-report");
     const btnLocate = document.getElementById("btn-locate");
     const locatorStatus = document.getElementById("locator-status");
 
-    let liveInterval = null;
-    let isLiveMode = true;
-    let currentClass = "None";
+    // --- Mode Switching Logic ---
+    function setInputMode(mode) {
+        activeInputMode = mode;
+        [btnModeSamples, btnModeUpload, btnModeWebcam, btnModeLive].forEach(b => b.classList.remove("active"));
+        samplesContainer.style.display = "none";
+        uploadPanel.style.display = "none";
+        webcamPanel.style.display = "none";
+        livePanel.style.display = "none";
+        streamSelectorBox.style.display = "none";
 
-    btnLocate.addEventListener("click", () => {
-        locatorStatus.innerText = "Accessing Geolocation...";
-        
-        const getQuery = () => {
-            const specificItems = ["Battery", "Smartphone", "Laptop", "CRT Monitor", "CRT-Monitor", "CRT-TV"];
-            if (specificItems.includes(currentClass)) {
-                return `${currentClass.replace('-', ' ')} recycling`;
-            }
-            return "e-waste recycling";
-        };
-
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                locatorStatus.innerText = "Coordinates acquired. Routing to Maps...";
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                
-                const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(getQuery())}/@${lat},${lng},12z`;
-                window.open(mapsUrl, "_blank");
-                
-                setTimeout(() => { locatorStatus.innerText = ""; }, 3000);
-            }, (error) => {
-                locatorStatus.innerText = "Location access denied. Opening general search.";
-                window.open(`https://www.google.com/maps/search/${encodeURIComponent(getQuery() + " near me")}`, "_blank");
-            });
-        } else {
-            locatorStatus.innerText = "Geolocation not supported.";
-            window.open(`https://www.google.com/maps/search/${encodeURIComponent(getQuery() + " near me")}`, "_blank");
+        // Stop live stream if leaving live mode
+        if (mode !== "live" && liveVideoFeed.src) {
+            liveVideoFeed.src = "";
+            fetch("/api/stop_stream", { method: "POST" }).catch(() => {});
         }
-    });
 
-    function startLivePolling() {
-        if (liveInterval) clearInterval(liveInterval);
-        liveInterval = setInterval(() => {
-            if (!isLiveMode) return;
-            fetch("/api/latest_detection")
-                .then(res => res.json())
-                .then(data => updateAnalytics(data))
-                .catch(err => console.error("Polling error", err));
-        }, 1000);
-    }
+        // Stop webcam stream if leaving webcam mode
+        if (mode !== "webcam" && webcamStream) {
+            webcamStream.getTracks().forEach(t => t.stop());
+            webcamStream = null;
+        }
 
-    function stopLivePolling() {
-        if (liveInterval) {
-            clearInterval(liveInterval);
-            liveInterval = null;
+        if (mode === "samples") {
+            btnModeSamples.classList.add("active");
+            samplesContainer.style.display = "block";
+            updateDataStream(`[ READY ] Select preset hardware sample.`);
+        } else if (mode === "upload") {
+            btnModeUpload.classList.add("active");
+            uploadPanel.style.display = "block";
+            updateDataStream(`[ READY ] Select or drag an e-waste photograph.`);
+        } else if (mode === "webcam") {
+            btnModeWebcam.classList.add("active");
+            webcamPanel.style.display = "block";
+            initWebcam();
+            updateDataStream(`[ WEBCAM ] Position hardware in frame and take snapshot.`);
+        } else if (mode === "live") {
+            btnModeLive.classList.add("active");
+            livePanel.style.display = "block";
+            streamSelectorBox.style.display = "flex";
+            startLiveStream("yolov8");
+            updateDataStream(`[ LIVE STREAM ] Real-time video detection active.`);
         }
     }
 
-    const liveVideo = document.createElement("video");
-    liveVideo.autoplay = true;
-    liveVideo.playsInline = true;
-    const liveCanvas = document.createElement("canvas");
-    let liveStream = null;
-    let liveFeedInterval = null;
+    btnModeSamples.addEventListener("click", () => setInputMode("samples"));
+    btnModeUpload.addEventListener("click", () => setInputMode("upload"));
+    btnModeWebcam.addEventListener("click", () => setInputMode("webcam"));
+    btnModeLive.addEventListener("click", () => setInputMode("live"));
 
-    btnLive.addEventListener("click", () => {
-        if (isLiveMode) return;
-        isLiveMode = true;
-        btnLive.classList.add("active");
-        btnUpload.classList.remove("active");
-        
-        uploadView.classList.remove("active");
-        liveView.classList.add("active");
-        
-        resetAnalytics();
-        
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                liveStream = stream;
-                liveVideo.srcObject = stream;
-                liveVideo.play();
-                
-                liveFeedInterval = setInterval(() => {
-                    if (liveVideo.videoWidth === 0) return;
-                    liveCanvas.width = liveVideo.videoWidth;
-                    liveCanvas.height = liveVideo.videoHeight;
-                    liveCanvas.getContext("2d").drawImage(liveVideo, 0, 0);
-                    liveCanvas.toBlob(blob => {
-                        const formData = new FormData();
-                        formData.append("image", new File([blob], "frame.jpg", { type: "image/jpeg" }));
-                        
-                        fetch("/api/analyze_frame_yolo", { method: "POST", body: formData })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.error) {
-                                    console.error(data.error);
-                                    if(isLiveMode) {
-                                        elClass.innerText = "SYS_ERROR";
-                                        elImpact.innerText = data.error;
-                                    }
-                                    return;
-                                }
-                                if(isLiveMode) {
-                                    videoFeed.src = data.image;
-                                    updateAnalytics(data.info, false);
-                                }
-                            }).catch(err => console.error(err));
-                    }, "image/jpeg", 0.7);
-                }, 500);
-            })
-            .catch(err => {
-                console.error("Camera error:", err);
-                alert("Please allow camera access for the Live Feed.");
-            });
+    // --- Sample Presets Selection ---
+    const sampleBtns = document.querySelectorAll(".sample-btn");
+    sampleBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            sampleBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentSample = btn.dataset.sample;
+            runSampleAudit(currentSample);
+        });
     });
 
-    btnUpload.addEventListener("click", () => {
-        if (!isLiveMode) return;
-        isLiveMode = false;
-        btnUpload.classList.add("active");
-        btnLive.classList.remove("active");
-        
-        liveView.classList.remove("active");
-        uploadView.classList.add("active");
-        
-        videoFeed.src = "";
-        
-        if (liveFeedInterval) clearInterval(liveFeedInterval);
-        if (liveStream) {
-            liveStream.getTracks().forEach(t => t.stop());
-            liveStream = null;
-        }
-        resetAnalytics();
-    });
-
-    btnTriggerFile.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
-
-    let browserStream = null;
-
-    btnTriggerWebcam.addEventListener("click", (e) => {
-        e.stopPropagation();
-        uploadBox.style.display = "none";
-        webcamBox.style.display = "flex";
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                browserStream = stream;
-                webcamVideo.srcObject = stream;
-            })
-            .catch(err => {
-                console.error("Webcam error:", err);
-                alert("Could not access webcam. Please check permissions.");
-                cancelBrowserWebcam();
-            });
-    });
-
-    function cancelBrowserWebcam() {
-        if (browserStream) {
-            browserStream.getTracks().forEach(track => track.stop());
-            browserStream = null;
-        }
-        webcamBox.style.display = "none";
-        uploadBox.style.display = "flex";
+    // Default activate first sample
+    if (sampleBtns.length > 0) {
+        sampleBtns[0].classList.add("active");
     }
 
-    btnCancelWebcam.addEventListener("click", cancelBrowserWebcam);
-
-    btnCaptureWebcam.addEventListener("click", () => {
-        if (!browserStream) return;
-        webcamCanvas.width = webcamVideo.videoWidth;
-        webcamCanvas.height = webcamVideo.videoHeight;
-        const ctx = webcamCanvas.getContext("2d");
-        ctx.drawImage(webcamVideo, 0, 0, webcamCanvas.width, webcamCanvas.height);
-        
-        webcamCanvas.toBlob(blob => {
-            const file = new File([blob], "snapshot.jpg", { type: "image/jpeg" });
-            cancelBrowserWebcam();
-            uploadBox.style.display = "none";
-            previewContainer.style.display = "flex";
-            imagePreview.src = URL.createObjectURL(file);
-            processImageFile(file);
-        }, "image/jpeg", 0.9);
-    });
-
-    fileInput.addEventListener("change", handleFileUpload);
-
-    btnResetUpload.addEventListener("click", () => {
-        previewContainer.style.display = "none";
-        uploadBox.style.display = "flex";
-        fileInput.value = "";
-        resetAnalytics();
-    });
-
-    function handleFileUpload() {
-        if (!fileInput.files.length) return;
-        const file = fileInput.files[0];
-        uploadBox.style.display = "none";
-        previewContainer.style.display = "flex";
-        imagePreview.src = URL.createObjectURL(file);
-        processImageFile(file);
-    }
-
-    function processImageFile(file) {
-        elClass.innerText = "ANALYZING_MATRIX";
-        elImpact.innerText = "Extracting hazard vectors via YOLOv8 and Gemini AI...";
-        dataStreamEl.innerText = "[ PROCESSING IMAGE_FILE_01 ]";
-        
-        const formData = new FormData();
-        formData.append("image", file);
-
-        fetch("/api/analyze_image", { method: "POST", body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                console.error(data.traceback || data.error);
-                elClass.innerText = "SYS_ERROR";
-                elImpact.innerText = `CRASH: ${data.error}`;
-                return;
-            }
-            imagePreview.src = data.image; 
-            updateAnalytics(data.info, true);
-        })
-        .catch(err => {
-            console.error(err);
-            elClass.innerText = "SYS_ERROR";
-            elImpact.innerText = "Network Error: Could not connect to the cloud server. It may have crashed due to memory limits.";
+    // --- Upload Dropzone Handling ---
+    if (btnBrowseFile && fileInput) {
+        btnBrowseFile.addEventListener("click", (e) => {
+            e.stopPropagation();
+            fileInput.click();
         });
     }
 
-    function resetAnalytics() {
-        elClass.innerText = "AWAITING...";
-        elClass.style.color = "var(--primary)";
-        elConf.innerText = "0.00%";
-        elValue.innerText = "₹0";
-        elImpact.innerText = isLiveMode ? "System idle. Waiting for hardware target..." : "Upload an image to execute scan.";
-        
-        elHazardBadge.classList.remove("danger");
-        elHazardBadge.querySelector(".icon").innerText = "✅";
-        elHazardBadge.querySelector(".text").innerText = "SECURE";
-        elHazardWarningCard.style.display = "none";
-        locatorCard.style.display = "none";
-        locatorStatus.innerText = "";
-        currentClass = "None";
+    if (uploadDropzone) {
+        uploadDropzone.addEventListener("click", () => fileInput.click());
+        uploadDropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            uploadDropzone.style.borderColor = "var(--primary)";
+            uploadDropzone.style.background = "rgba(0, 255, 163, 0.1)";
+        });
+        uploadDropzone.addEventListener("dragleave", () => {
+            uploadDropzone.style.borderColor = "";
+            uploadDropzone.style.background = "";
+        });
+        uploadDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            uploadDropzone.style.borderColor = "";
+            uploadDropzone.style.background = "";
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
     }
 
-    function updateAnalytics(info, forceAnimate = false) {
-        if (!info) return;
-
-        const shouldAnimate = forceAnimate || currentClass !== info.class;
-        currentClass = info.class;
-
-        if (info.class === "None") {
-            elClass.innerText = "SCANNING...";
-            elClass.style.color = "var(--primary)";
-            elConf.innerText = "0.00%";
-            elValue.innerText = "₹0";
-            if(elImpact.innerText !== "Checking Gemini AI...") {
-                 elImpact.innerText = "Scanning environment for e-waste...";
+    if (fileInput) {
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files && fileInput.files.length > 0) {
+                handleFile(fileInput.files[0]);
             }
-            elHazardBadge.classList.remove("danger");
-            elHazardBadge.querySelector(".icon").innerText = "✅";
-            elHazardBadge.querySelector(".text").innerText = "SECURE";
-            elHazardWarningCard.style.display = "none";
-            locatorCard.style.display = "none";
-            locatorStatus.innerText = "";
-            return;
+        });
+    }
+
+    function handleFile(file) {
+        currentUploadedFile = file;
+        updateDataStream(`[ FILE LOADED ] ${file.name} (${Math.round(file.size / 1024)} KB)`);
+        runUploadedFileAudit(file);
+    }
+
+    // --- Webcam Capture ---
+    function initWebcam() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 640, facingMode: "environment" } })
+                .then(stream => {
+                    webcamStream = stream;
+                    webcamVideo.srcObject = stream;
+                })
+                .catch(err => {
+                    console.error("Webcam error:", err);
+                    alert("Could not access camera. Please verify camera permissions in browser.");
+                });
         }
+    }
 
-        elClass.innerText = info.class.toUpperCase();
-        elConf.innerText = info.confidence + "%";
-        elValue.innerText = info.value;
-        
-        if (info.impact) {
-            elImpact.innerText = info.impact;
+    if (btnTakeSnapshot) {
+        btnTakeSnapshot.addEventListener("click", () => {
+            if (!webcamVideo || webcamVideo.videoWidth === 0) return;
+            webcamCanvas.width = webcamVideo.videoWidth;
+            webcamCanvas.height = webcamVideo.videoHeight;
+            const ctx = webcamCanvas.getContext("2d");
+            ctx.drawImage(webcamVideo, 0, 0, webcamCanvas.width, webcamCanvas.height);
+            webcamCanvas.toBlob(blob => {
+                currentSnapshotBlob = blob;
+                const file = new File([blob], "webcam_snap.jpg", { type: "image/jpeg" });
+                updateDataStream("[ SNAPSHOT CAPTURED ] Executing 3-model scan...");
+                runUploadedFileAudit(file);
+            }, "image/jpeg", 0.9);
+        });
+    }
+
+    // --- Live Stream Model Switching ---
+    const streamBtns = document.querySelectorAll(".stream-btn");
+    streamBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            streamBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const m = btn.dataset.model;
+            startLiveStream(m);
+        });
+    });
+
+    function startLiveStream(modelName) {
+        fetch("/api/set_stream_model", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: modelName })
+        }).then(() => {
+            liveVideoFeed.src = `/video_feed?model=${modelName}&t=${Date.now()}`;
+        }).catch(err => console.error("Error setting stream model:", err));
+    }
+
+    // --- Master Execution Button ---
+    if (btnRunAll) {
+        btnRunAll.addEventListener("click", () => {
+            if (activeInputMode === "samples") {
+                runSampleAudit(currentSample);
+            } else if (activeInputMode === "upload") {
+                if (currentUploadedFile) {
+                    runUploadedFileAudit(currentUploadedFile);
+                } else {
+                    fileInput.click();
+                }
+            } else if (activeInputMode === "webcam") {
+                if (btnTakeSnapshot) btnTakeSnapshot.click();
+            } else if (activeInputMode === "live") {
+                // In live mode, capture current frame and run 3 models
+                captureLiveStreamSnapshot();
+            }
+        });
+    }
+
+    function captureLiveStreamSnapshot() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 640;
+        canvas.height = 640;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(liveVideoFeed, 0, 0, 640, 640);
+        canvas.toBlob(blob => {
+            const file = new File([blob], "live_snap.jpg", { type: "image/jpeg" });
+            runUploadedFileAudit(file);
+        }, "image/jpeg", 0.9);
+    }
+
+    // --- Simultaneous Multi-Model Execution APIs ---
+    function setScanningUI(isScanning) {
+        if (btnRunAll) {
+            if (isScanning) {
+                btnRunAll.classList.add("loading");
+                btnRunAll.innerText = "⏳ SCANNING ALL 3 ENGINES PARALLEL...";
+            } else {
+                btnRunAll.classList.remove("loading");
+                btnRunAll.innerText = "⚡ RUN SIMULTANEOUS 3-MODEL SCAN";
+            }
         }
-
-        dataStreamEl.innerText = `[ MATCH_FOUND: ${info.class.toUpperCase()} @ ${info.confidence}% ]`;
-
-        if (info.hazard) {
-            elClass.style.color = "var(--hazard)";
-            elHazardBadge.classList.add("danger");
-            elHazardBadge.querySelector(".icon").innerText = "☣️";
-            elHazardBadge.querySelector(".text").innerText = "HAZARD";
-            
-            elHazardWarningCard.style.display = "block";
-            elHazardText.innerText = info.hazard_text;
-        } else {
-            elClass.style.color = "var(--primary)";
-            elHazardBadge.classList.remove("danger");
-            elHazardBadge.querySelector(".icon").innerText = "✅";
-            elHazardBadge.querySelector(".text").innerText = "SECURE";
-            
-            elHazardWarningCard.style.display = "none";
+        if (globalStatusText) {
+            globalStatusText.innerText = isScanning ? "INSPECTING WITH YOLOv8, YOLOv5, AND FASTER R-CNN..." : "ENGINES READY (YOLOv8 // YOLOv5 // FASTER R-CNN)";
         }
+    }
 
-        // Show locator button only when something is detected
-        locatorCard.style.display = "block";
+    function updateDataStream(msg) {
+        if (dataStreamEl) dataStreamEl.innerText = msg;
+    }
 
-        if (shouldAnimate) {
-            gsap.from([elClass, elValue, elImpact], {
-                y: 10,
-                opacity: 0.5,
-                duration: 0.2,
-                stagger: 0.1,
+    function runSampleAudit(sampleName) {
+        setScanningUI(true);
+        updateDataStream(`[ DISPATCH ] Dispatching sample '${sampleName}' across all 3 neural networks...`);
+
+        fetch("/api/analyze_sample", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sample_name: sampleName, conf: 0.15 })
+        })
+        .then(res => res.json())
+        .then(data => {
+            setScanningUI(false);
+            if (data.error) {
+                console.error(data.error);
+                updateDataStream(`[ ERROR ] ${data.error}`);
+                alert("Inspection Error: " + data.error);
+                return;
+            }
+            renderMultiModelResults(data);
+        })
+        .catch(err => {
+            setScanningUI(false);
+            console.error(err);
+            updateDataStream("[ NETWORK ERROR ] Could not reach vision server.");
+        });
+    }
+
+    function runUploadedFileAudit(file) {
+        setScanningUI(true);
+        updateDataStream(`[ DISPATCH ] Uploading ${file.name} to 3-model parallel vision suite...`);
+
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("conf", "0.15");
+
+        fetch("/api/analyze_multi_models", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            setScanningUI(false);
+            if (data.error) {
+                console.error(data.error);
+                updateDataStream(`[ ERROR ] ${data.error}`);
+                alert("Inspection Error: " + data.error);
+                return;
+            }
+            renderMultiModelResults(data);
+        })
+        .catch(err => {
+            setScanningUI(false);
+            console.error(err);
+            updateDataStream("[ NETWORK ERROR ] Could not reach vision server.");
+        });
+    }
+
+    // --- Render All 3 Models in the Dashboard Simultaneously ---
+    function renderMultiModelResults(data) {
+        lastScanData = data;
+        const models = data.models || {};
+        const comp = data.comparison || {};
+        const report = data.report || "";
+
+        // 1. UPDATE DASHBOARD SECTION 1: YOLOv8
+        const v8 = models.yolov8 || {};
+        updateSingleModelCard("v8", v8);
+
+        // 2. UPDATE DASHBOARD SECTION 2: YOLOv5
+        const v5 = models.yolov5 || {};
+        updateSingleModelCard("v5", v5);
+
+        // 3. UPDATE DASHBOARD SECTION 3: FASTER R-CNN
+        const frcnn = models.faster_rcnn || {};
+        updateSingleModelCard("frcnn", frcnn);
+
+        // 4. UPDATE SIDE-BY-SIDE BENCHMARK MATRIX TABLE
+        updateBenchmarkMatrix(v8, v5, frcnn);
+
+        // 5. UPDATE GEMINI ENVIRONMENTAL IMPACT REPORT
+        renderGeminiReport(report);
+
+        updateDataStream(`[ TRI-MODEL AUDIT COMPLETE ] Consensus: ${comp.consensus_top ? comp.consensus_top.class : 'None'} | Fastest: ${comp.fastest_model} (${comp.fastest_latency}ms)`);
+
+        // GSAP Stagger Highlight on update
+        if (window.gsap) {
+            gsap.from(".model-card", {
+                y: 12,
+                opacity: 0.8,
+                stagger: 0.08,
+                duration: 0.35,
                 ease: "power2.out"
             });
         }
     }
 
-    // --- Mobile Link Logic ---
-    const btnMobileConnect = document.getElementById("btn-mobile-connect");
-    const mobileModal = document.getElementById("mobile-modal");
-    const qrCode = document.getElementById("qr-code");
-    const btnCloseModal = document.getElementById("btn-close-modal");
+    function updateSingleModelCard(prefix, m) {
+        const imgEl = document.getElementById(`${prefix}-img`);
+        const latEl = document.getElementById(`${prefix}-latency`);
+        const countEl = document.getElementById(`${prefix}-count`);
+        const fpsEl = document.getElementById(`${prefix}-fps`);
+        const clsEl = document.getElementById(`${prefix}-class`);
+        const confEl = document.getElementById(`${prefix}-conf`);
+        const meterEl = document.getElementById(`${prefix}-meter`);
+        const valEl = document.getElementById(`${prefix}-value`);
+        const hazEl = document.getElementById(`${prefix}-hazard`);
+        const hazBox = document.getElementById(`${prefix}-hazard-box`);
+        const tagsEl = document.getElementById(`${prefix}-tags`);
 
-    if (btnMobileConnect && mobileModal) {
-        btnMobileConnect.addEventListener("click", (e) => {
-            e.preventDefault();
-            const url = window.location.origin + '/mobile';
-            qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}&bgcolor=FFFFFF`;
-            mobileModal.style.display = "flex";
-        });
+        if (imgEl && m.image) imgEl.src = m.image;
+        if (latEl) latEl.innerText = (m.latency_ms !== undefined) ? `${m.latency_ms} ms` : "--";
+        if (countEl) countEl.innerText = m.count !== undefined ? m.count : 0;
+        if (fpsEl && prefix !== "frcnn") fpsEl.innerText = m.fps ? `${m.fps} FPS` : "--";
 
-        btnCloseModal.addEventListener("click", () => {
-            mobileModal.style.display = "none";
+        const top = m.top_detection;
+        if (top) {
+            if (clsEl) clsEl.innerText = top.class.toUpperCase();
+            if (confEl) confEl.innerText = `${top.confidence}%`;
+            if (meterEl) meterEl.style.width = `${top.confidence}%`;
+        } else {
+            if (clsEl) clsEl.innerText = m.count === 0 ? "NONE DETECTED" : "SCANNING...";
+            if (confEl) confEl.innerText = "0%";
+            if (meterEl) meterEl.style.width = "0%";
+        }
+
+        if (valEl) valEl.innerText = m.total_value || "₹0";
+
+        if (hazEl && hazBox) {
+            if (m.has_hazard) {
+                hazEl.innerText = "⚠️ HAZARD RISK";
+                hazBox.classList.add("danger");
+            } else {
+                hazEl.innerText = "SECURE";
+                hazBox.classList.remove("danger");
+            }
+        }
+
+        if (tagsEl) {
+            const dets = m.detections || [];
+            if (dets.length === 0) {
+                tagsEl.innerHTML = `<span class="no-tags">No items detected above threshold</span>`;
+            } else {
+                tagsEl.innerHTML = dets.map(d => {
+                    const hClass = d.hazard ? "hazard-tag" : "";
+                    return `<span class="b-tag ${hClass}">${d.class} (${d.confidence}%)</span>`;
+                }).join(" ");
+            }
+        }
+    }
+
+    function updateBenchmarkMatrix(v8, v5, frcnn) {
+        const setTxt = (id, txt) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = txt;
+        };
+
+        // Latencies
+        setTxt("tbl-v8-latency", v8.latency_ms ? `${v8.latency_ms} ms (${v8.fps} FPS)` : "--");
+        setTxt("tbl-v5-latency", v5.latency_ms ? `${v5.latency_ms} ms (${v5.fps} FPS)` : "--");
+        setTxt("tbl-frcnn-latency", frcnn.latency_ms ? `${frcnn.latency_ms} ms (Two-Stage)` : "--");
+
+        // Object Counts
+        setTxt("tbl-v8-count", v8.count !== undefined ? v8.count : 0);
+        setTxt("tbl-v5-count", v5.count !== undefined ? v5.count : 0);
+        setTxt("tbl-frcnn-count", frcnn.count !== undefined ? frcnn.count : 0);
+
+        // Primary Classification
+        const fmtPrimary = (m) => m.top_detection ? `${m.top_detection.class} (${m.top_detection.confidence}%)` : "None";
+        setTxt("tbl-v8-primary", fmtPrimary(v8));
+        setTxt("tbl-v5-primary", fmtPrimary(v5));
+        setTxt("tbl-frcnn-primary", fmtPrimary(frcnn));
+
+        // Total Value
+        setTxt("tbl-v8-val", v8.total_value || "₹0");
+        setTxt("tbl-v5-val", v5.total_value || "₹0");
+        setTxt("tbl-frcnn-val", frcnn.total_value || "₹0");
+
+        // Hazard status
+        const fmtHaz = (m) => m.has_hazard ? "⚠️ HAZARD FLAGGED" : "SECURE";
+        setTxt("tbl-v8-hazard", fmtHaz(v8));
+        setTxt("tbl-v5-hazard", fmtHaz(v5));
+        setTxt("tbl-frcnn-hazard", fmtHaz(frcnn));
+    }
+
+    function renderGeminiReport(markdownText) {
+        if (!reportContent) return;
+        if (window.marked) {
+            reportContent.innerHTML = marked.parse(markdownText);
+        } else {
+            reportContent.innerText = markdownText;
+        }
+    }
+
+    // --- Report Action Buttons ---
+    if (btnCopyReport) {
+        btnCopyReport.addEventListener("click", () => {
+            if (lastScanData && lastScanData.report) {
+                navigator.clipboard.writeText(lastScanData.report).then(() => {
+                    btnCopyReport.innerText = "✓ COPIED TO CLIPBOARD";
+                    setTimeout(() => { btnCopyReport.innerText = "📋 COPY REPORT"; }, 2500);
+                });
+            } else {
+                alert("Please perform a scan first to generate a report.");
+            }
         });
     }
 
-    // --- Inventory Logic ---
+    if (btnRegenReport) {
+        btnRegenReport.addEventListener("click", () => {
+            if (!lastScanData) {
+                alert("No active scan available to audit.");
+                return;
+            }
+            updateDataStream("[ GEMINI LLM ] Re-synthesizing technical e-waste audit...");
+            reportContent.innerHTML = `<div class="report-placeholder"><span class="spinner-icon">⚙️</span><p>Re-generating deep environmental analysis report with Gemini...</p></div>`;
+
+            const classes = lastScanData.comparison ? lastScanData.comparison.classes_detected : [];
+            fetch("/api/generate_report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ detected_classes: classes })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.report) {
+                    renderGeminiReport(data.report);
+                    updateDataStream("[ GEMINI REPORT READY ] Re-generated successfully.");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                updateDataStream("[ ERROR ] Re-generation failed.");
+            });
+        });
+    }
+
+    // --- Geolocation Drop-Off Locator ---
+    if (btnLocate) {
+        btnLocate.addEventListener("click", () => {
+            if (!locatorStatus) return;
+            locatorStatus.innerText = "Requesting GPS coordinates...";
+
+            const detectedClass = (lastScanData && lastScanData.comparison && lastScanData.comparison.consensus_top) 
+                ? lastScanData.comparison.consensus_top.class 
+                : "e-waste";
+
+            const query = `${detectedClass} recycling centers near me`;
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        locatorStatus.innerText = "Coordinates verified. Launching certified maps routing...";
+                        const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}/@${lat},${lng},12z`;
+                        window.open(mapsUrl, "_blank");
+                        setTimeout(() => { locatorStatus.innerText = ""; }, 3000);
+                    },
+                    (err) => {
+                        locatorStatus.innerText = "Location permission unavailable. Launching regional search...";
+                        window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank");
+                        setTimeout(() => { locatorStatus.innerText = ""; }, 3000);
+                    }
+                );
+            } else {
+                window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank");
+            }
+        });
+    }
+
+    // --- Inventory Modal Logic ---
     const btnInventory = document.getElementById("btn-inventory");
     const inventoryModal = document.getElementById("inventory-modal");
     const btnCloseInventory = document.getElementById("btn-close-inventory");
@@ -463,73 +587,89 @@ document.addEventListener("DOMContentLoaded", () => {
         btnInventory.addEventListener("click", (e) => {
             e.preventDefault();
             inventoryModal.style.display = "flex";
-            loadInventory();
+            loadInventoryRecords();
         });
-        btnCloseInventory.addEventListener("click", () => {
-            inventoryModal.style.display = "none";
-        });
-    }
-
-    function loadInventory() {
-        inventoryContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); font-style: italic;">Loading inventory records...</p>';
-        fetch('/api/inventory')
-        .then(res => res.json())
-        .then(data => {
-            if (data.length === 0) {
-                inventoryContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 50px;">No E-Waste records found in mainframe.</p>';
-                return;
-            }
-            
-            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">';
-            data.forEach(item => {
-                const info = item.info;
-                const hazardStyle = info.hazard ? 'border-color: var(--hazard);' : '';
-                const hazardBadge = info.hazard ? `<div style="color: var(--hazard); font-size: 0.8rem; font-weight: bold; margin-bottom: 10px;">⚠️ HAZARDOUS</div>` : '';
-                
-                html += `
-                    <div class="card-glass" style="padding: 15px; display: flex; flex-direction: column; gap: 10px; ${hazardStyle}">
-                        <img src="${item.image_url}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
-                        <div>
-                            <h3 style="color: var(--primary); margin-bottom: 5px; font-family: 'Share Tech Mono';">${info.class.toUpperCase()}</h3>
-                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">${item.timestamp}</div>
-                            <div style="font-size: 1.2rem; font-weight: bold; color: #C3E88D; margin-bottom: 10px;">${info.value}</div>
-                            ${hazardBadge}
-                            <p style="font-size: 0.85rem; color: var(--text-muted); height: 80px; overflow-y: auto;">${info.impact}</p>
-                        </div>
-                    </div>
-                `;
+        if (btnCloseInventory) {
+            btnCloseInventory.addEventListener("click", () => {
+                inventoryModal.style.display = "none";
             });
-            html += '</div>';
-            inventoryContainer.innerHTML = html;
-        })
-        .catch(err => {
-            inventoryContainer.innerHTML = '<p style="text-align: center; color: var(--hazard);">Failed to load inventory.</p>';
-        });
+        }
     }
 
-    // Polling for Desktop Sync from Mobile Uploads
+    function loadInventoryRecords() {
+        if (!inventoryContainer) return;
+        inventoryContainer.innerHTML = '<p class="muted-text">Fetching database records...</p>';
+
+        fetch('/api/inventory')
+            .then(res => res.json())
+            .then(data => {
+                if (!data || data.length === 0) {
+                    inventoryContainer.innerHTML = '<p class="muted-text" style="padding: 40px; text-align: center;">No e-waste items logged yet. Perform a scan to save items.</p>';
+                    return;
+                }
+
+                let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">';
+                data.forEach(item => {
+                    const info = item.info || {};
+                    const hazardStyle = info.hazard ? 'border-color: var(--hazard);' : '';
+                    const hazardBadge = info.hazard ? '<div style="color: var(--hazard); font-size: 0.75rem; font-weight: bold; margin-bottom: 6px;">⚠️ HAZARDOUS RECYCLING REQUIRED</div>' : '';
+
+                    html += `
+                        <div class="glass-card" style="padding: 12px; ${hazardStyle}">
+                            <img src="${item.image_url}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px; margin-bottom: 10px;" />
+                            <h4 style="color: var(--primary); font-family: 'Share Tech Mono';">${info.class || 'Unknown'}</h4>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">${item.timestamp}</div>
+                            <div style="font-size: 1.1rem; font-weight: bold; color: var(--gold); margin-bottom: 6px;">${info.value || '₹0'}</div>
+                            ${hazardBadge}
+                            <p style="font-size: 0.75rem; color: var(--text-muted);">${info.summary || ''}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                inventoryContainer.innerHTML = html;
+            })
+            .catch(() => {
+                inventoryContainer.innerHTML = '<p style="color: var(--hazard);">Failed to load inventory.</p>';
+            });
+    }
+
+    // --- Mobile Link Modal ---
+    const btnMobileConnect = document.getElementById("btn-mobile-connect");
+    const mobileModal = document.getElementById("mobile-modal");
+    const qrCode = document.getElementById("qr-code");
+    const btnCloseModal = document.getElementById("btn-close-modal");
+
+    if (btnMobileConnect && mobileModal) {
+        btnMobileConnect.addEventListener("click", (e) => {
+            e.preventDefault();
+            const url = window.location.origin + '/mobile';
+            if (qrCode) {
+                qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(url)}&bgcolor=FFFFFF`;
+            }
+            mobileModal.style.display = "flex";
+        });
+        if (btnCloseModal) {
+            btnCloseModal.addEventListener("click", () => {
+                mobileModal.style.display = "none";
+            });
+        }
+    }
+
+    // --- Desktop Polling for Mobile Upload Sync ---
     setInterval(() => {
         fetch("/api/desktop_sync")
-        .then(res => res.json())
-        .then(data => {
-            if(data.has_new) {
-                // Switch to upload view
-                btnUpload.click();
-                previewContainer.style.display = "flex";
-                uploadBox.style.display = "none";
-                imagePreview.src = data.data.image;
-                
-                elClass.innerText = "MOBILE SYNCING...";
-                elClass.style.color = "var(--hazard)";
-                dataStreamEl.innerText = "[ INCOMING MOBILE DATA... ]";
-                
-                setTimeout(() => {
-                    updateAnalytics(data.data.info, true);
-                }, 1000);
-            }
-        })
-        .catch(err => {});
-    }, 2000);
+            .then(res => res.json())
+            .then(data => {
+                if (data.has_new && data.data) {
+                    updateDataStream("[ MOBILE SYNC ] Real-time mobile audit received!");
+                    renderMultiModelResults(data.data);
+                }
+            })
+            .catch(() => {});
+    }, 2500);
 
-    startLivePolling();
+    // Initial Trigger on Page Load: Run PCB Sample automatically so user sees the 3 models immediately
+    setTimeout(() => {
+        runSampleAudit("pcb");
+    }, 600);
 });

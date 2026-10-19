@@ -9,3 +9,8 @@ env/
 inventory.json
 WasteDetector/ewaste-dataset/
 WasteDetector/runs/detect/train*/weights/last.pt
+WasteDetector/runs/**/last.pt
+WasteDetector/runs/**/last.pth
+**/last.pth
+**/last.pt
+WasteDetector/static/uploads/scan_*.jpg

@@ -2,15 +2,25 @@ import os
 import cv2
 import numpy as np
 import threading
-from flask import Flask, render_template, Response, request, jsonify
-from ultralytics import YOLO
+import time
 import base64
-from google import genai
-import imutils
 import json
 import socket
-import time
 import uuid
+from flask import Flask, render_template, Response, request, jsonify, send_from_directory
+from PIL import Image
+import torch
+import torchvision.transforms.functional as TF
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from ultralytics import YOLO
+
+# Try importing google.genai
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
 
 def get_local_ip():
     try:
@@ -23,9 +33,31 @@ def get_local_ip():
         return "127.0.0.1"
 
 app = Flask(__name__)
+torch.set_num_threads(2)
 
-# Constants and Data
-cls_name = ['Air-Conditioner', 'Bar-Phone', 'Battery', 'Blood-Pressure-Monitor', 'Boiler', 'CRT-Monitor', 'CRT-TV', 'Calculator', 'Camera', 'Ceiling-Fan', 'Christmas-Lights', 'Clothes-Iron', 'Coffee-Machine', 'Compact-Fluorescent-Lamps', 'Computer-Keyboard', 'Computer-Mouse', 'Cooled-Dispenser', 'Cooling-Display', 'Dehumidifier', 'Desktop-PC', 'Digital-Oscilloscope', 'Dishwasher', 'Drone', 'Electric-Bicycle', 'Electric-Guitar', 'Electrocardiograph-Machine', 'Electronic-Keyboard', 'Exhaust-Fan', 'Flashlight', 'Flat-Panel-Monitor', 'Flat-Panel-TV', 'Floor-Fan', 'Freezer', 'Glucose-Meter', 'HDD', 'Hair-Dryer', 'Headphone', 'LED-Bulb', 'Laptop', 'Microwave', 'Music-Player', 'Neon-Sign', 'Network-Switch', 'Non-Cooled-Dispenser', 'Oven', 'PCB', 'Patient-Monitoring-System', 'Photovoltaic-Panel', 'PlayStation-5', 'Power-Adapter', 'Printer', 'Projector', 'Pulse-Oximeter', 'Range-Hood', 'Refrigerator', 'Rotary-Mower', 'Router', 'SSD', 'Server', 'Smart-Watch', 'Smartphone', 'Smoke-Detector', 'Soldering-Iron', 'Speaker', 'Stove', 'Straight-Tube-Fluorescent-Lamp', 'Street-Lamp', 'TV-Remote-Control', 'Table-Lamp', 'Tablet', 'Telephone-Set', 'Toaster', 'Tumble-Dryer', 'USB-Flash-Drive', 'Vacuum-Cleaner', 'Washing-Machine', 'Xbox-Series-X']
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ---------------------------------------------------------------------------
+# 77 E-Waste Classes & Domain Metadata
+# ---------------------------------------------------------------------------
+cls_name = [
+    'Air-Conditioner', 'Bar-Phone', 'Battery', 'Blood-Pressure-Monitor', 'Boiler', 
+    'CRT-Monitor', 'CRT-TV', 'Calculator', 'Camera', 'Ceiling-Fan', 
+    'Christmas-Lights', 'Clothes-Iron', 'Coffee-Machine', 'Compact-Fluorescent-Lamps', 
+    'Computer-Keyboard', 'Computer-Mouse', 'Cooled-Dispenser', 'Cooling-Display', 
+    'Dehumidifier', 'Desktop-PC', 'Digital-Oscilloscope', 'Dishwasher', 'Drone', 
+    'Electric-Bicycle', 'Electric-Guitar', 'Electrocardiograph-Machine', 'Electronic-Keyboard', 
+    'Exhaust-Fan', 'Flashlight', 'Flat-Panel-Monitor', 'Flat-Panel-TV', 'Floor-Fan', 
+    'Freezer', 'Glucose-Meter', 'HDD', 'Hair-Dryer', 'Headphone', 'LED-Bulb', 
+    'Laptop', 'Microwave', 'Music-Player', 'Neon-Sign', 'Network-Switch', 
+    'Non-Cooled-Dispenser', 'Oven', 'PCB', 'Patient-Monitoring-System', 
+    'Photovoltaic-Panel', 'PlayStation-5', 'Power-Adapter', 'Printer', 'Projector', 
+    'Pulse-Oximeter', 'Range-Hood', 'Refrigerator', 'Rotary-Mower', 'Router', 
+    'SSD', 'Server', 'Smart-Watch', 'Smartphone', 'Smoke-Detector', 'Soldering-Iron', 
+    'Speaker', 'Stove', 'Straight-Tube-Fluorescent-Lamp', 'Street-Lamp', 
+    'TV-Remote-Control', 'Table-Lamp', 'Tablet', 'Telephone-Set', 'Toaster', 
+    'Tumble-Dryer', 'USB-Flash-Drive', 'Vacuum-Cleaner', 'Washing-Machine', 'Xbox-Series-X'
+]
 
 value_mapping = {
     'Air-Conditioner': 1200, 'Bar-Phone': 100, 'Battery': 0, 'Blood-Pressure-Monitor': 50, 
@@ -50,176 +82,539 @@ value_mapping = {
 }
 
 hazard_mapping = {
-    'Battery': 'HAZMAT WARNING: Fire risk. Contains heavy metals/acid. Do NOT crush or puncture.',
-    'CRT-Monitor': 'HAZMAT WARNING: Contains high levels of Lead and Phosphorus glass. Handle carefully.',
-    'CRT-TV': 'HAZMAT WARNING: Contains high levels of Lead and Phosphorus glass. Handle carefully.',
-    'Compact-Fluorescent-Lamps': 'HAZMAT WARNING: Contains Mercury vapor. Extremely toxic if broken.',
-    'Straight-Tube-Fluorescent-Lamp': 'HAZMAT WARNING: Contains Mercury vapor. Extremely toxic if broken.',
-    'Smoke-Detector': 'HAZMAT WARNING: Contains radioactive materials (Americium-241). Special disposal required.',
-    'Air-Conditioner': 'HAZMAT WARNING: Contains harmful refrigerants. Must be evacuated professionally.',
-    'Refrigerator': 'HAZMAT WARNING: Contains harmful refrigerants. Must be evacuated professionally.',
-    'Freezer': 'HAZMAT WARNING: Contains harmful refrigerants. Must be evacuated professionally.',
-    'Dehumidifier': 'HAZMAT WARNING: Contains harmful refrigerants. Must be evacuated professionally.'
+    'Battery': 'HAZMAT WARNING: Fire & explosion risk. Contains Lithium, Lead, or Acid. Do NOT crush or puncture.',
+    'CRT-Monitor': 'HAZMAT WARNING: High vacuum implosion hazard. Contains up to 4-8 lbs of toxic Lead and Phosphor glass.',
+    'CRT-TV': 'HAZMAT WARNING: High vacuum implosion hazard. Contains toxic Lead glass and Barium.',
+    'Compact-Fluorescent-Lamps': 'HAZMAT WARNING: Contains volatile Mercury vapor. Extremely hazardous if broken.',
+    'Straight-Tube-Fluorescent-Lamp': 'HAZMAT WARNING: Contains volatile Mercury vapor. Requires hazardous bulb recycler.',
+    'Smoke-Detector': 'HAZMAT WARNING: Contains radioactive Americium-241 ionization sources. Requires radioactive disposal protocol.',
+    'Air-Conditioner': 'HAZMAT WARNING: Contains pressurized Ozone-depleting Refrigerants (CFC/HFC). Requires licensed evacuation.',
+    'Refrigerator': 'HAZMAT WARNING: Contains harmful greenhouse refrigerants and compressor oils.',
+    'Freezer': 'HAZMAT WARNING: Contains pressurized refrigerants (Freon/R-134a). Do not vent to atmosphere.',
+    'Dehumidifier': 'HAZMAT WARNING: Contains closed-loop refrigerant circuits.'
 }
 
-fallback_impacts = {
-    "Battery": "Batteries contain lithium, cobalt, and toxic heavy metals. They can easily start fires if punctured or crushed in normal trash. Recycle at designated battery drop-off locations.",
-    "Smartphone": "Smartphones contain valuable metals like gold, silver, and copper, but also toxic lead and mercury. Dropping them in landfills poisons soil and groundwater.",
-    "Laptop": "Laptops hold a large lithium-ion battery and complex circuitry. E-waste recycling facilities can recover their precious metals and safely neutralize the battery.",
-    "Keyboard": "Keyboards are mostly plastic and minor circuitry. While not highly toxic, they break down into microplastics if discarded improperly.",
-    "Mouse": "Computer mice contribute to electronic plastic waste. Specialized recyclers can shred them to recover copper wiring and ABS plastic.",
-    "PCB": "Printed Circuit Boards are the goldmines of e-waste, containing copper, gold, and palladium. However, they also contain toxic brominated flame retardants.",
-    "Motherboard": "Motherboards are dense with valuable metals but coated in toxic flame retardants. Professional smelting is required to safely extract the gold and silver.",
-    "CRT Monitor": "Old CRT monitors are extremely hazardous, containing several pounds of lead glass. They must be carefully disassembled by certified professionals.",
-    "CRT-Monitor": "Old CRT monitors are extremely hazardous, containing several pounds of lead glass. They must be carefully disassembled by certified professionals.",
-    "CRT-TV": "Old CRT TVs are extremely hazardous, containing several pounds of lead glass. They must be carefully disassembled by certified professionals.",
-    "Compact-Fluorescent-Lamps": "CFLs contain highly toxic mercury vapor. If broken, they contaminate the surrounding air and soil. Must be recycled safely.",
-    "Straight-Tube-Fluorescent-Lamp": "Fluorescent tubes contain highly toxic mercury vapor. If broken, they contaminate the surrounding air and soil. Must be recycled safely.",
-    "Smoke-Detector": "Smoke detectors contain a small amount of radioactive Americium-241. They should be mailed back to the manufacturer or taken to specialized hazardous waste centers.",
-    "Air-Conditioner": "Air conditioners contain toxic refrigerants (CFCs/HFCs) that are incredibly potent greenhouse gases if released into the atmosphere.",
-    "Refrigerator": "Refrigerators contain toxic refrigerants (CFCs/HFCs) that are incredibly potent greenhouse gases if released into the atmosphere.",
-    "Freezer": "Freezers contain toxic refrigerants (CFCs/HFCs) that are incredibly potent greenhouse gases if released into the atmosphere.",
-    "Dehumidifier": "Dehumidifiers contain toxic refrigerants (CFCs/HFCs) that are incredibly potent greenhouse gases if released into the atmosphere."
-}
+# ---------------------------------------------------------------------------
+# Individual Model Engines (Distinct Code & Weights - Never Mixed)
+# ---------------------------------------------------------------------------
 
-# Global State
-model = None
-model_error = ""
+class YOLOv8Detector:
+    """Model 2: YOLOv8 Anchor-Free Production Engine"""
+    def __init__(self):
+        self.model = None
+        self.error = None
+        self.lock = threading.Lock()
+        self.weights_path = os.path.join(BASE_DIR, "runs", "detect", "train-8", "weights", "best.pt")
 
-gemini_cache = {}
-fetching_classes = set()
+    def _ensure_loaded(self):
+        if self.model is None and self.error is None:
+            with self.lock:
+                if self.model is None:
+                    try:
+                        if not os.path.exists(self.weights_path):
+                            raise FileNotFoundError(f"YOLOv8 weights not found at {self.weights_path}")
+                        self.model = YOLO(self.weights_path)
+                    except Exception as e:
+                        self.error = str(e)
+                        print(f"[YOLOv8] Error loading model: {e}")
 
-# Lock for camera
-camera_lock = threading.Lock()
-cap = None
-is_streaming = False
-mobile_sync_data = None
-INVENTORY_FILE = "inventory.json"
+    def predict(self, frame, conf=0.20):
+        self._ensure_loaded()
+        if self.error:
+            return {"error": self.error, "model_id": "yolov8", "name": "YOLOv8 SOTA"}
+
+        t_start = time.perf_counter()
+        results = self.model.predict(source=frame, save=False, verbose=False, conf=conf, iou=0.45)
+        latency = (time.perf_counter() - t_start) * 1000
+
+        result = results[0]
+        plotted_frame = result.plot()
+        boxes = result.boxes
+
+        detections = []
+        if boxes is not None and len(boxes) > 0:
+            for b in boxes:
+                cls_idx = int(b.cls[0].item())
+                score = float(b.conf[0].item())
+                cname = cls_name[cls_idx] if cls_idx < len(cls_name) else f"Class-{cls_idx}"
+                xyxy = [int(v) for v in b.xyxy[0].tolist()]
+                detections.append({
+                    "class": cname,
+                    "confidence": int(score * 100),
+                    "score": round(score, 3),
+                    "box": xyxy,
+                    "value": f"₹{value_mapping.get(cname, 20)}",
+                    "hazard": cname in hazard_mapping,
+                    "hazard_text": hazard_mapping.get(cname, "")
+                })
+
+        detections.sort(key=lambda d: d["score"], reverse=True)
+        top = detections[0] if detections else None
+        total_val = sum([value_mapping.get(d["class"], 20) for d in detections])
+        hazards = [d for d in detections if d["hazard"]]
+
+        return {
+            "model_id": "yolov8",
+            "model_name": "YOLOv8n Deep Vision",
+            "architecture": "Single-Stage Anchor-Free (C2f Backbone + Decoupled Head)",
+            "latency_ms": round(latency, 1),
+            "fps": round(1000.0 / max(latency, 1.0), 1),
+            "count": len(detections),
+            "top_detection": top,
+            "detections": detections,
+            "total_value": f"₹{total_val}",
+            "has_hazard": len(hazards) > 0,
+            "hazard_text": hazards[0]["hazard_text"] if hazards else "",
+            "annotated_frame": plotted_frame
+        }
+
+
+class YOLOv5Detector:
+    """Model 1: YOLOv5 Anchor-Based Baseline Engine"""
+    def __init__(self):
+        self.model = None
+        self.error = None
+        self.lock = threading.Lock()
+        self.weights_path = os.path.join(BASE_DIR, "runs", "yolov5", "train", "weights", "best.pt")
+
+    def _ensure_loaded(self):
+        if self.model is None and self.error is None:
+            with self.lock:
+                if self.model is None:
+                    try:
+                        if not os.path.exists(self.weights_path):
+                            raise FileNotFoundError(f"YOLOv5 weights not found at {self.weights_path}")
+                        self.model = YOLO(self.weights_path)
+                    except Exception as e:
+                        self.error = str(e)
+                        print(f"[YOLOv5] Error loading model: {e}")
+
+    def predict(self, frame, conf=0.20):
+        self._ensure_loaded()
+        if self.error:
+            return {"error": self.error, "model_id": "yolov5", "name": "YOLOv5 Baseline"}
+
+        t_start = time.perf_counter()
+        results = self.model.predict(source=frame, save=False, verbose=False, conf=conf, iou=0.45)
+        latency = (time.perf_counter() - t_start) * 1000
+
+        result = results[0]
+        plotted_frame = result.plot()
+        boxes = result.boxes
+
+        detections = []
+        if boxes is not None and len(boxes) > 0:
+            for b in boxes:
+                cls_idx = int(b.cls[0].item())
+                score = float(b.conf[0].item())
+                cname = cls_name[cls_idx] if cls_idx < len(cls_name) else f"Class-{cls_idx}"
+                xyxy = [int(v) for v in b.xyxy[0].tolist()]
+                detections.append({
+                    "class": cname,
+                    "confidence": int(score * 100),
+                    "score": round(score, 3),
+                    "box": xyxy,
+                    "value": f"₹{value_mapping.get(cname, 20)}",
+                    "hazard": cname in hazard_mapping,
+                    "hazard_text": hazard_mapping.get(cname, "")
+                })
+
+        detections.sort(key=lambda d: d["score"], reverse=True)
+        top = detections[0] if detections else None
+        total_val = sum([value_mapping.get(d["class"], 20) for d in detections])
+        hazards = [d for d in detections if d["hazard"]]
+
+        return {
+            "model_id": "yolov5",
+            "model_name": "YOLOv5s Baseline",
+            "architecture": "Single-Stage Anchor-Based (C3 Backbone + Coupled Head)",
+            "latency_ms": round(latency, 1),
+            "fps": round(1000.0 / max(latency, 1.0), 1),
+            "count": len(detections),
+            "top_detection": top,
+            "detections": detections,
+            "total_value": f"₹{total_val}",
+            "has_hazard": len(hazards) > 0,
+            "hazard_text": hazards[0]["hazard_text"] if hazards else "",
+            "annotated_frame": plotted_frame
+        }
+
+
+class FasterRCNNDetector:
+    """Model 3: Faster R-CNN ResNet-50-FPN Two-Stage Engine"""
+    def __init__(self):
+        self.model = None
+        self.error = None
+        self.class_names = cls_name
+        self.device = torch.device("cpu")
+        self.lock = threading.Lock()
+        self.weights_path = os.path.join(BASE_DIR, "runs", "faster_rcnn", "weights", "best.pth")
+
+    def _ensure_loaded(self):
+        if self.model is None and self.error is None:
+            with self.lock:
+                if self.model is None:
+                    try:
+                        if not os.path.exists(self.weights_path):
+                            raise FileNotFoundError(f"Faster R-CNN weights not found at {self.weights_path}")
+                        
+                        ckpt = torch.load(self.weights_path, map_location=self.device)
+                        num_classes = ckpt.get("num_classes", 78)
+                        if "classes" in ckpt and len(ckpt["classes"]) > 0:
+                            self.class_names = ckpt["classes"]
+
+                        m = fasterrcnn_resnet50_fpn(weights=None)
+                        in_features = m.roi_heads.box_predictor.cls_score.in_features
+                        m.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+                        m.load_state_dict(ckpt["model_state_dict"])
+                        m.to(self.device)
+                        m.eval()
+                        self.model = m
+                    except Exception as e:
+                        self.error = str(e)
+                        print(f"[Faster R-CNN] Error loading model: {e}")
+
+    def predict(self, frame, conf=0.20):
+        self._ensure_loaded()
+        if self.error:
+            return {"error": self.error, "model_id": "faster_rcnn", "name": "Faster R-CNN"}
+
+        t_start = time.perf_counter()
+        orig_h, orig_w, _ = frame.shape
+        rgb_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        resized = TF.resize(rgb_pil, [640, 640])
+        tensor = TF.to_tensor(resized).unsqueeze(0).to(self.device)
+
+        with torch.no_grad():
+            preds = self.model(tensor)[0]
+
+        latency = (time.perf_counter() - t_start) * 1000
+
+        boxes = preds["boxes"].cpu().numpy()
+        scores = preds["scores"].cpu().numpy()
+        labels = preds["labels"].cpu().numpy()
+
+        sx = orig_w / 640.0
+        sy = orig_h / 640.0
+
+        detections = []
+        annotated_frame = frame.copy()
+
+        for box, label, score in zip(boxes, labels, scores):
+            if score < conf:
+                continue
+            
+            # Label 0 is background, classes are 1..77
+            cls_idx = label - 1
+            if 0 <= cls_idx < len(self.class_names):
+                cname = self.class_names[cls_idx]
+            else:
+                cname = f"Class-{label}"
+
+            x1 = int(box[0] * sx)
+            y1 = int(box[1] * sy)
+            x2 = int(box[2] * sx)
+            y2 = int(box[3] * sy)
+
+            is_hazard = cname in hazard_mapping
+            hazard_txt = hazard_mapping.get(cname, "")
+            score_pct = int(score * 100)
+
+            detections.append({
+                "class": cname,
+                "confidence": score_pct,
+                "score": round(float(score), 3),
+                "box": [x1, y1, x2, y2],
+                "value": f"₹{value_mapping.get(cname, 20)}",
+                "hazard": is_hazard,
+                "hazard_text": hazard_txt
+            })
+
+            # Draw distinct Faster R-CNN visual box (Violet / Neon Purple theme)
+            box_color = (255, 60, 100) if is_hazard else (255, 140, 180)  # BGR
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 2)
+            
+            label_caption = f"{cname} {score_pct}%"
+            (tw, th), _ = cv2.getTextSize(label_caption, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+            cv2.rectangle(annotated_frame, (x1, max(0, y1 - th - 6)), (x1 + tw + 4, max(th + 6, y1)), box_color, -1)
+            cv2.putText(annotated_frame, label_caption, (x1 + 2, max(th + 2, y1 - 3)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+
+        detections.sort(key=lambda d: d["score"], reverse=True)
+        top = detections[0] if detections else None
+        total_val = sum([value_mapping.get(d["class"], 20) for d in detections])
+        hazards = [d for d in detections if d["hazard"]]
+
+        return {
+            "model_id": "faster_rcnn",
+            "model_name": "Faster R-CNN ResNet-50",
+            "architecture": "Two-Stage Region Proposal (ResNet-50-FPN + RoIAlign)",
+            "latency_ms": round(latency, 1),
+            "fps": round(1000.0 / max(latency, 1.0), 1),
+            "count": len(detections),
+            "top_detection": top,
+            "detections": detections,
+            "total_value": f"₹{total_val}",
+            "has_hazard": len(hazards) > 0,
+            "hazard_text": hazards[0]["hazard_text"] if hazards else "",
+            "annotated_frame": annotated_frame
+        }
+
+
+# Initialize model detectors
+detector_v8 = YOLOv8Detector()
+detector_v5 = YOLOv5Detector()
+detector_frcnn = FasterRCNNDetector()
+
+# ---------------------------------------------------------------------------
+# Gemini LLM Environmental Report Generator (Report generation only)
+# ---------------------------------------------------------------------------
+
+def generate_gemini_report(detections_summary):
+    """
+    Generates a comprehensive E-Waste Inspection and Environmental Report.
+    NOTE: Gemini LLM is used EXCLUSIVELY for generating this report.
+    Image detection is performed entirely by YOLOv8, YOLOv5, and Faster R-CNN.
+    """
+    items_detected = detections_summary.get("detected_classes", [])
+    if not items_detected:
+        return (
+            "### 📋 E-Waste Inspection Report\n\n"
+            "**Status:** No electronic waste components were identified in the scanned frame.\n\n"
+            "- Ensure the target hardware is well-illuminated and clearly framed.\n"
+            "- Supported categories include PCBs, Batteries, Displays, Computing Equipment, and Household Appliances."
+        )
+
+    unique_items = list(set(items_detected))
+    items_str = ", ".join(unique_items)
+    hazards_found = detections_summary.get("hazards", [])
+
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+
+    if HAS_GENAI and api_key:
+        try:
+            client = genai.Client(api_key=api_key)
+            prompt = f"""
+You are an expert Environmental Engineer and certified Hazardous E-Waste Inspector.
+An automated computer vision audit utilizing YOLOv8, YOLOv5, and Faster R-CNN has detected the following electronic hardware components:
+Detected Items: {items_str}
+Detected Hazards: {', '.join(hazards_found) if hazards_found else 'None flagged as high-risk'}
+
+Generate a professional, structured Environmental Impact & Recycling Audit Report in Markdown format with the following exact sections:
+1. ## 🔍 Executive Summary & Hardware Breakdown
+   Brief technical overview of what was identified and its lifecycle status.
+2. ## ☣️ Ecological Hazard & Toxicity Assessment
+   Detail the heavy metals (Lead, Cadmium, Mercury, Brominated Flame Retardants, Lithium) present in these items and their risks to soil/groundwater.
+3. ## 💎 Urban Mining & Precious Metal Recovery Potential
+   Quantify recoverable materials (Gold, Silver, Copper, Palladium, Rare Earth Elements) and explain why landfilling them is economically wasteful.
+4. ## 🛠️ Step-by-Step Certified Recycling Roadmap
+   Actionable protocols for safe disassembly, battery neutralization, component separation, and certified drop-off.
+5. ## 📜 Regulatory Compliance Directives
+   Reference applicable standards (RoHS, WEEE Directives, Basel Convention, and Local E-Waste Management Rules).
+
+Keep the report punchy, highly informative, and scientifically accurate.
+"""
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+            )
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            print(f"[Gemini API Error] {e}")
+
+    # Fallback High-Quality Technical Report Generator
+    report_lines = [
+        "## 🔍 Executive Summary & Hardware Breakdown",
+        f"Automated multi-model computer vision successfully cataloged **{len(unique_items)} hardware categories**: **{items_str}**.",
+        "These assemblies contain dense printed circuitry, discrete silicon semiconductors, and structural chassis components.",
+        "",
+        "## ☣️ Ecological Hazard & Toxicity Assessment"
+    ]
+
+    if hazards_found:
+        report_lines.append(f"⚠️ **CRITICAL HAZARDS DETECTED:** {len(hazards_found)} components present active contamination hazards:")
+        for h in hazards_found:
+            report_lines.append(f"- **{h}**")
+        report_lines.append("Improper landfill disposal allows leachate to contaminate local aquifers with toxic lead and heavy metals.")
+    else:
+        report_lines.append("The identified items contain low immediately volatile hazards, but printed circuit boards and power stages contain brominated flame retardants (BFRs) that release dioxins if incinerated.")
+
+    report_lines.extend([
+        "",
+        "## 💎 Urban Mining & Precious Metal Recovery Potential",
+        "Electronic waste holds significantly higher concentrations of precious metals than virgin mined ore:",
+        f"- **Gold (Au) & Silver (Ag):** Found on connector pins, bonding wires, and edge fingers of {unique_items[0] if unique_items else 'PCBs'}.",
+        "- **Copper (Cu):** High yield recoverable from multi-layer PCB ground planes, transformer coils, and internal harnesses.",
+        "- **Palladium & Platinum Group Metals:** Present in multi-layer ceramic capacitors (MLCCs).",
+        "",
+        "## 🛠️ Step-by-Step Certified Recycling Roadmap",
+        "1. **Discharge & Isolation:** Depower and safely isolate any internal capacitors or lithium cells.",
+        "2. **Chassis Separation:** Segregate external ABS plastics and aluminum heat sinks from populated PCBs.",
+        "3. **Authorized E-Waste Drop-Off:** Hand over assemblies exclusively to R2 (Responsible Recycling) or e-Stewards certified facilities.",
+        "",
+        "## 📜 Regulatory Compliance Directives",
+        "- **RoHS Compliant Handling:** Mandates containment of restricted substances (Pb, Cd, Hg, Cr-VI).",
+        "- **WEEE Directive 2012/19/EU:** Obligates 85% material recovery and minimum 80% recycling rate by mass.",
+        "- **Basel Convention:** Prohibits transboundary movement of hazardous e-waste to developing nations."
+    ])
+
+    return "\n".join(report_lines)
+
+# ---------------------------------------------------------------------------
+# Inventory Management
+# ---------------------------------------------------------------------------
+
+INVENTORY_FILE = os.path.join(BASE_DIR, "inventory.json")
 
 def load_inventory():
     if os.path.exists(INVENTORY_FILE):
         try:
             with open(INVENTORY_FILE, 'r') as f:
                 return json.load(f)
-        except:
+        except Exception:
             return []
     return []
 
-def save_inventory_to_disk():
-    with open(INVENTORY_FILE, 'w') as f:
-        json.dump(inventory_history, f, indent=4)
+def save_inventory_to_disk(records):
+    try:
+        with open(INVENTORY_FILE, 'w') as f:
+            json.dump(records, f, indent=4)
+    except Exception as e:
+        print(f"Error saving inventory: {e}")
 
 inventory_history = load_inventory()
 
-def save_to_inventory(info, img_array):
-    if info and info.get('class') != 'None':
-        filename = f"item_{int(time.time())}_{uuid.uuid4().hex[:6]}.jpg"
-        upload_dir = os.path.join("static", "uploads")
+def save_item_to_inventory(top_class, value_str, is_hazard, img_array, model_summary=""):
+    if top_class and top_class != 'None':
+        filename = f"scan_{int(time.time())}_{uuid.uuid4().hex[:6]}.jpg"
+        upload_dir = os.path.join(BASE_DIR, "static", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
         filepath = os.path.join(upload_dir, filename)
-        # Convert RGB back to BGR for cv2 if needed, but it should already be BGR
         cv2.imwrite(filepath, img_array)
-        
+
         record = {
             "id": filename,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "image_url": f"/static/uploads/{filename}",
-            "info": info
+            "info": {
+                "class": top_class,
+                "value": value_str,
+                "hazard": is_hazard,
+                "summary": model_summary
+            }
         }
         inventory_history.insert(0, record)
-        save_inventory_to_disk()
+        save_inventory_to_disk(inventory_history)
 
-latest_detection_info = {
-    'class': 'None',
-    'confidence': 0,
-    'value': '₹0',
-    'hazard': False,
-    'impact': 'Waiting for detection...'
-}
+# Global video streaming state
+camera_lock = threading.Lock()
+cap = None
+is_streaming = False
+current_stream_model = "yolov8"
+mobile_sync_data = None
 
-def fetch_gemini_info(class_name):
-    if class_name in gemini_cache:
-        return gemini_cache[class_name]
+# ---------------------------------------------------------------------------
+# Multi-Model Synchronous Inference Core
+# ---------------------------------------------------------------------------
+
+def run_all_three_models(frame, conf=0.20):
+    """
+    Executes YOLOv8, YOLOv5, and Faster R-CNN on the EXACT same input frame.
+    Each model runs with its own dedicated weights and output pipeline.
+    """
+    # 1. Run YOLOv8
+    res_v8 = detector_v8.predict(frame, conf=conf)
     
-    try:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if not api_key:
-            return "API Key missing! Please set GEMINI_API_KEY."
+    # 2. Run YOLOv5
+    res_v5 = detector_v5.predict(frame, conf=conf)
+    
+    # 3. Run Faster R-CNN
+    res_frcnn = detector_frcnn.predict(frame, conf=conf)
 
-        client = genai.Client(api_key=api_key)
-        prompt = f"Provide a brief, 2-sentence explanation of the environmental impact of {class_name} as e-waste, and mention if it is hazardous and why. Keep it punchy and informative. Also briefly suggest how to recycle it."
-        
-        response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=prompt,
+    # Encode images to JPEG Base64
+    def to_b64(img):
+        if img is None:
+            return ""
+        _, buf = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        return f"data:image/jpeg;base64,{base64.b64encode(buf).decode('utf-8')}"
+
+    img_v8_b64 = to_b64(res_v8.get("annotated_frame"))
+    img_v5_b64 = to_b64(res_v5.get("annotated_frame"))
+    img_frcnn_b64 = to_b64(res_frcnn.get("annotated_frame"))
+
+    # Cleanup raw numpy frames from json output
+    res_v8_clean = {k: v for k, v in res_v8.items() if k != "annotated_frame"}
+    res_v5_clean = {k: v for k, v in res_v5.items() if k != "annotated_frame"}
+    res_frcnn_clean = {k: v for k, v in res_frcnn.items() if k != "annotated_frame"}
+
+    res_v8_clean["image"] = img_v8_b64
+    res_v5_clean["image"] = img_v5_b64
+    res_frcnn_clean["image"] = img_frcnn_b64
+
+    # Build Comparative Consensus
+    all_classes = set()
+    for m in [res_v8_clean, res_v5_clean, res_frcnn_clean]:
+        for d in m.get("detections", []):
+            all_classes.add(d["class"])
+
+    all_hazards = []
+    for m in [res_v8_clean, res_v5_clean, res_frcnn_clean]:
+        if m.get("hazard_text"):
+            all_hazards.append(f"{m['model_name']}: {m['hazard_text']}")
+
+    # Determine fastest & highest confidence
+    models_list = [res_v8_clean, res_v5_clean, res_frcnn_clean]
+    valid_models = [m for m in models_list if "error" not in m]
+    
+    fastest = min(valid_models, key=lambda m: m["latency_ms"]) if valid_models else res_v8_clean
+    most_sensitive = max(valid_models, key=lambda m: m["count"]) if valid_models else res_v8_clean
+
+    # Pick overall representative detection for inventory
+    top_candidates = [m["top_detection"] for m in valid_models if m.get("top_detection")]
+    consensus_top = max(top_candidates, key=lambda d: d["score"]) if top_candidates else None
+
+    # Generate Gemini Report (Prompt receives text detection summary ONLY)
+    report_summary = {
+        "detected_classes": list(all_classes),
+        "hazards": list(set(all_hazards))
+    }
+    ai_report = generate_gemini_report(report_summary)
+
+    # Save representative item to inventory
+    if consensus_top:
+        save_item_to_inventory(
+            consensus_top["class"],
+            consensus_top["value"],
+            consensus_top["hazard"],
+            res_v8.get("annotated_frame", frame),
+            f"Audited by 3 Models: YOLOv8 ({res_v8_clean['count']}), YOLOv5 ({res_v5_clean['count']}), Faster R-CNN ({res_frcnn_clean['count']})"
         )
-        gemini_cache[class_name] = response.text
-        return response.text
-    except Exception as e:
-        error_msg = f"API Error: {str(e)}"
-        print(f"Gemini API Error for {class_name}: {error_msg}")
-        # Use our intelligent fallback instead of showing a rate limit error to the user
-        fallback = fallback_impacts.get(class_name, f"{class_name} should be handled by a certified e-waste recycling facility to recover materials and prevent environmental contamination.")
-        gemini_cache[class_name] = fallback
-        return fallback
 
-def process_frame_for_info(frame):
-    global model, model_error
-    
-    # Lazy load the model to save RAM on boot and catch exact crash moments
-    if model is None and model_error == "":
-        try:
-            import torch
-            torch.set_num_threads(1)  # Drastically reduces RAM usage on Render
-            
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(base_dir, "runs", "detect", "train-8", "weights", "best.pt")
-            model = YOLO(model_path)
-        except Exception as e:
-            model_error = str(e)
-            print(f"Error loading model: {e}")
+    return {
+        "models": {
+            "yolov8": res_v8_clean,
+            "yolov5": res_v5_clean,
+            "faster_rcnn": res_frcnn_clean
+        },
+        "comparison": {
+            "fastest_model": fastest.get("model_name", "YOLOv8"),
+            "fastest_latency": fastest.get("latency_ms", 0),
+            "most_sensitive": most_sensitive.get("model_name", "YOLOv5"),
+            "max_objects_found": most_sensitive.get("count", 0),
+            "total_distinct_classes": len(all_classes),
+            "classes_detected": list(all_classes),
+            "consensus_top": consensus_top
+        },
+        "report": ai_report
+    }
 
-    if model is None:
-        return frame, {
-            'class': 'None',
-            'confidence': 0,
-            'value': '₹0',
-            'hazard': False,
-            'impact': f'CRITICAL ERROR: YOLO failed to load! Details: {model_error}'
-        }
-    
-    # Lowered confidence threshold to 0.15 to ensure detections happen
-    result = model.predict(source=frame, save=False, verbose=False, conf=0.15, iou=0.5)[0]
-    boxes = result.boxes
-    
-    info = None
-    if boxes is not None and len(boxes) > 0:
-        plotted_frame = result.plot()
-        
-        best_box = max(boxes, key=lambda b: b.conf[0].item())
-        class_index = int(best_box.cls[0].item())
-        confidence = float(best_box.conf[0].item())
-        current_class = cls_name[class_index]
-        conf_pct = int(confidence * 100)
-        
-        val = value_mapping.get(current_class, 20)
-        value_str = f"₹{val}"
-        
-        is_hazard = current_class in hazard_mapping
-        
-        info = {
-            'class': current_class,
-            'confidence': conf_pct,
-            'value': value_str,
-            'hazard': is_hazard,
-            'hazard_text': hazard_mapping.get(current_class, ""),
-        }
-        return plotted_frame, info
-        
-    return frame, None
+# ---------------------------------------------------------------------------
+# Streaming Generator
+# ---------------------------------------------------------------------------
 
-def generate_frames():
-    global cap, latest_detection_info, is_streaming
+def generate_video_stream():
+    global cap, is_streaming, current_stream_model
     
     with camera_lock:
         if cap is None or not cap.isOpened():
@@ -236,39 +631,24 @@ def generate_frames():
         if not success:
             break
         
-        processed_frame, info = process_frame_for_info(frame)
-        
-        if info:
-            # We want to update global latest_detection_info but we don't want to block the video stream waiting for Gemini
-            c_name = info['class']
-            impact_text = "Checking Gemini AI..."
-            if c_name in gemini_cache:
-                impact_text = gemini_cache[c_name]
-            elif c_name not in fetching_classes:
-                fetching_classes.add(c_name)
-                # Fire and forget thread
-                def bg_fetch(name):
-                    txt = fetch_gemini_info(name)
-                    gemini_cache[name] = txt
-                    fetching_classes.discard(name)
-                threading.Thread(target=bg_fetch, args=(c_name,), daemon=True).start()
-                
-            info['impact'] = impact_text
-            latest_detection_info = info
+        # In live streaming, run selected model (default YOLOv8 for 30+ FPS)
+        if current_stream_model == "yolov5":
+            res = detector_v5.predict(frame, conf=0.25)
+        elif current_stream_model == "faster_rcnn":
+            res = detector_frcnn.predict(frame, conf=0.25)
         else:
-            latest_detection_info = {
-                'class': 'None',
-                'confidence': 0,
-                'value': '₹0',
-                'hazard': False,
-                'impact': 'Scanning...'
-            }
+            res = detector_v8.predict(frame, conf=0.25)
             
-        ret, buffer = cv2.imencode('.jpg', processed_frame)
+        display_frame = res.get("annotated_frame", frame)
+        ret, buffer = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
         frame_bytes = buffer.tobytes()
         
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+# ---------------------------------------------------------------------------
+# Flask Routes
+# ---------------------------------------------------------------------------
 
 @app.route('/')
 def index():
@@ -280,7 +660,21 @@ def mobile():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    global current_stream_model
+    m = request.args.get('model', 'yolov8').lower()
+    if m in ['yolov8', 'yolov5', 'faster_rcnn']:
+        current_stream_model = m
+    return Response(generate_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/set_stream_model', methods=['POST'])
+def set_stream_model():
+    global current_stream_model
+    data = request.get_json() or {}
+    m = data.get('model', 'yolov8').lower()
+    if m in ['yolov8', 'yolov5', 'faster_rcnn']:
+        current_stream_model = m
+        return jsonify({"status": "ok", "stream_model": current_stream_model})
+    return jsonify({"error": "Invalid model specified"}), 400
 
 @app.route('/api/stop_stream', methods=['POST'])
 def stop_stream():
@@ -292,11 +686,93 @@ def stop_stream():
             cap = None
     return jsonify({"status": "stopped"})
 
-@app.route('/api/latest_detection')
-def get_latest_detection():
-    return jsonify(latest_detection_info)
+@app.route('/api/analyze_multi_models', methods=['POST'])
+def analyze_multi_models():
+    """
+    Main Endpoint: Runs YOLOv8, YOLOv5, and Faster R-CNN simultaneously on the uploaded frame.
+    """
+    try:
+        if 'image' in request.files:
+            file = request.files['image']
+            npimg = np.frombuffer(file.read(), np.uint8)
+            frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+        elif request.is_json and 'image_base64' in request.json:
+            b64_str = request.json['image_base64'].split(',')[-1]
+            img_bytes = base64.b64decode(b64_str)
+            npimg = np.frombuffer(img_bytes, np.uint8)
+            frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+        else:
+            return jsonify({"error": "No image data provided in request"}), 400
 
-@app.route('/api/desktop_sync')
+        if frame is None:
+            return jsonify({"error": "Failed to decode image matrix"}), 400
+
+        conf = float(request.form.get('conf', 0.20)) if request.form else 0.20
+        payload = run_all_three_models(frame, conf=conf)
+        return jsonify(payload)
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+@app.route('/api/analyze_image', methods=['POST'])
+def analyze_image():
+    """Legacy compatibility endpoint pointing to the multi-model pipeline"""
+    return analyze_multi_models()
+
+@app.route('/api/analyze_sample', methods=['POST'])
+def analyze_sample():
+    """Runs simultaneous 3-model scan on a bundled sample image"""
+    try:
+        data = request.get_json() or {}
+        sample_name = data.get('sample_name', 'pcb')
+        sample_file = os.path.join(BASE_DIR, 'static', 'samples', f'{sample_name}.jpg')
+        
+        if not os.path.exists(sample_file):
+            return jsonify({"error": f"Sample file not found: {sample_name}.jpg"}), 404
+            
+        frame = cv2.imread(sample_file)
+        if frame is None:
+            return jsonify({"error": "Could not read sample file"}), 500
+
+        conf = float(data.get('conf', 0.20))
+        payload = run_all_three_models(frame, conf=conf)
+        return jsonify(payload)
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+@app.route('/api/generate_report', methods=['POST'])
+def generate_report_endpoint():
+    """Dedicated endpoint to re-generate the Gemini Environmental Report"""
+    try:
+        data = request.get_json() or {}
+        report = generate_gemini_report(data)
+        return jsonify({"report": report})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sample_images', methods=['GET'])
+def get_sample_images():
+    samples_dir = os.path.join(BASE_DIR, 'static', 'samples')
+    samples = []
+    if os.path.exists(samples_dir):
+        for f in os.listdir(samples_dir):
+            if f.endswith('.jpg'):
+                name = os.path.splitext(f)[0]
+                samples.append({
+                    "id": name,
+                    "title": name.replace('_', ' ').capitalize(),
+                    "url": f"/static/samples/{f}"
+                })
+    return jsonify(samples)
+
+@app.route('/api/inventory', methods=['GET'])
+def get_inventory():
+    return jsonify(inventory_history)
+
+@app.route('/api/desktop_sync', methods=['GET'])
 def desktop_sync():
     global mobile_sync_data
     if mobile_sync_data:
@@ -304,10 +780,6 @@ def desktop_sync():
         mobile_sync_data = None
         return jsonify({"has_new": True, "data": data})
     return jsonify({"has_new": False})
-
-@app.route('/api/inventory')
-def get_inventory():
-    return jsonify(inventory_history)
 
 @app.route('/api/mobile_upload', methods=['POST'])
 def mobile_upload():
@@ -319,115 +791,21 @@ def mobile_upload():
     npimg = np.frombuffer(file.read(), np.uint8)
     frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
     
-    processed_frame, info = process_frame_for_info(frame)
-    
-    if info:
-        c_name = info['class']
-        info['impact'] = fetch_gemini_info(c_name)
-        save_to_inventory(info, processed_frame)
-    else:
-        info = {
-            'class': 'None',
-            'confidence': 0,
-            'value': '₹0',
-            'hazard': False,
-            'impact': 'No E-Waste detected in frame.'
-        }
-        
-    _, buffer = cv2.imencode('.jpg', processed_frame)
-    base64_img = base64.b64encode(buffer).decode('utf-8')
-    
-    mobile_sync_data = {
-        "info": info,
-        "image": f"data:image/jpeg;base64,{base64_img}"
+    payload = run_all_three_models(frame, conf=0.20)
+    top = payload["comparison"].get("consensus_top") or {
+        "class": "None", "value": "₹0", "hazard": False, "hazard_text": ""
     }
-    return jsonify({"status": "success", "data": mobile_sync_data})
-
-@app.route('/api/analyze_image', methods=['POST'])
-def analyze_image():
-    try:
-        if 'image' not in request.files:
-            return jsonify({"error": "No image uploaded"}), 400
-            
-        file = request.files['image']
-        npimg = np.frombuffer(file.read(), np.uint8)
-        frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-        if frame is None:
-            return jsonify({"error": "Failed to decode image using cv2.imdecode. Is it a valid image file?"}), 400
-        
-        processed_frame, info = process_frame_for_info(frame)
-        
-        if info:
-            c_name = info['class']
-            info['impact'] = fetch_gemini_info(c_name)
-            save_to_inventory(info, processed_frame)
-        else:
-            info = {
-                'class': 'None',
-                'confidence': 0,
-                'value': '₹0',
-                'hazard': False,
-                'impact': 'No E-Waste detected in frame.'
-            }
-            
-        _, buffer = cv2.imencode('.jpg', processed_frame)
-        base64_img = base64.b64encode(buffer).decode('utf-8')
-        
-        return jsonify({
-            "info": info,
-            "image": f"data:image/jpeg;base64,{base64_img}"
-        })
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
-@app.route('/api/analyze_frame_yolo', methods=['POST'])
-def analyze_frame_yolo():
-    try:
-        if 'image' not in request.files:
-            return jsonify({"error": "No image uploaded"}), 400
-            
-        file = request.files['image']
-        npimg = np.frombuffer(file.read(), np.uint8)
-        frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-        if frame is None:
-            return jsonify({"error": "Failed to decode image using cv2.imdecode. Is it a valid image file?"}), 400
-        
-        processed_frame, info = process_frame_for_info(frame)
-        
-        if info:
-            c_name = info['class']
-            impact_text = "Checking Gemini AI..."
-            if c_name in gemini_cache:
-                impact_text = gemini_cache[c_name]
-            elif c_name not in fetching_classes and c_name != 'None':
-                fetching_classes.add(c_name)
-                def bg_fetch(name):
-                    txt = fetch_gemini_info(name)
-                    gemini_cache[name] = txt
-                    fetching_classes.discard(name)
-                threading.Thread(target=bg_fetch, args=(c_name,), daemon=True).start()
-                
-            info['impact'] = impact_text
-        else:
-            info = {
-                'class': 'None',
-                'confidence': 0,
-                'value': '₹0',
-                'hazard': False,
-                'impact': 'Scanning...'
-            }
-            
-        _, buffer = cv2.imencode('.jpg', processed_frame)
-        base64_img = base64.b64encode(buffer).decode('utf-8')
-        
-        return jsonify({
-            "info": info,
-            "image": f"data:image/jpeg;base64,{base64_img}"
-        })
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+    payload["info"] = {
+        "class": top.get("class", "None"),
+        "confidence": top.get("confidence", 0),
+        "value": top.get("value", "₹0"),
+        "hazard": top.get("hazard", False),
+        "hazard_text": top.get("hazard_text", ""),
+        "impact": payload.get("report", "")
+    }
+    payload["image"] = payload["models"]["yolov8"].get("image", "")
+    mobile_sync_data = payload
+    return jsonify({"status": "success", "data": payload})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

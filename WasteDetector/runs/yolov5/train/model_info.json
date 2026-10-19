@@ -1,0 +1,14 @@
+{
+    "model_name": "YOLOv5",
+    "architecture": "Single-stage, anchor-based CSPDarknet53",
+    "base_weights": "yolov5nu.pt",
+    "dataset": "D:\\e waste project\\WasteDetector-main\\WasteDetector\\data.yaml",
+    "epochs": 5,
+    "batch_size": 16,
+    "imgsz": 640,
+    "duration": "0:12:11",
+    "save_dir": "D:\\e waste project\\WasteDetector-main\\WasteDetector\\runs\\yolov5\\train",
+    "best_weights": "D:\\e waste project\\WasteDetector-main\\WasteDetector\\runs\\yolov5\\train\\weights\\best.pt",
+    "last_weights": "D:\\e waste project\\WasteDetector-main\\WasteDetector\\runs\\yolov5\\train\\weights\\last.pt",
+    "completed_at": "2026-10-12 12:22:36"
+}
